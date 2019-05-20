@@ -251,6 +251,94 @@
         return arr;
     }
 
+    _.debounce = function(fn, delay, immediate) {
+        var timer = null;
+        var immediate = immediate || false;
+        var result;
+
+        var debounce = function() {
+            var context = this;
+            var args = [].slice.apply(arguments);
+            if(false !== immediate) {
+                if(timer) clearTimeout(timer);
+                result = fn.apply(context, args);
+                immediate = false;
+
+                timer = setTimeout(function () {
+                    result = fn.apply(context, args);
+                }, delay);
+
+                return result;
+            }
+
+            if(timer) clearTimeout(timer);
+
+            timer = setTimeout(function() {
+                //result can't to return...
+                result = fn.apply(context, args);
+            }, delay);
+
+        };
+
+        debounce.reset = function (immediate) {
+            immediate = immediate || false;
+        };
+        debounce.cancell = function () {
+            clearTimeout(timer);
+            timer = null;
+        };
+    };
+
+    _.throttle = function(fn, delay, options) {
+        var timer, context, args, result, previous;
+        var options = options || {
+            leading: true,
+            trailing: true
+        };
+
+        var throttle = function() {
+            var now = new Date().getTime();
+            // previous = 0 cause fn run immediately;
+            if (previous === undefined) previous = 0;
+            //  = now cause fn can't run immediately;
+            if (!previous && options.leading !== false) previous = now;
+            var remaining = delay - (now - previous);
+            if (remaining <= 0 || remaining > delay) {
+                //if enter delay limits clearTimeout remove trailing effect;
+                if(timer) {
+                    clearTimeout(timer);
+                    timer = null;
+                }
+                context = this;
+                args = [].slice.call(arguments);
+                result= fn.apply(context, args);
+                previous = now;
+                return result;
+                
+            } else if(!timer && options.trailing !== false) {
+                // trailing effect caused by setTimeout
+                timer = setTimeout(function() {
+                    fn.apply(context, args);
+                    context = args = null;
+                }, remaining);
+            }
+        };
+
+        throttle.cancell = function() {
+            previous = now;
+            clearTimeout(timer);
+            timer = null;
+        };
+
+        throttle.reset = function (options) {
+            previous = 0;
+            options = options || {
+                leading: true,
+                trailing: true
+            };
+        };
+    }
+
     _.onceLog = function (...args) {
         if (logOnce) return;
         console.log('onceLog: ', ...args);
@@ -271,7 +359,9 @@
             }
         }
         console.log('eqLog: ', ...logArrs);
-        fnArrs && fnArrs.forEach(fn => fn());
+        fnArrs && fnArrs.forEach(fn => {
+            typeof fn === 'function' && fn();
+        });
     };
 
     _.mixins(_);
