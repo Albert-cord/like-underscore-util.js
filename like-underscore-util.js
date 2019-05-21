@@ -30,6 +30,7 @@
     var builtinIteratee = _.iteratee = function (value, context) {
         return cb(value, context);
     }
+    var noop = function() {};
 
     var logOnce = false;
 
@@ -74,6 +75,26 @@
 
     _.identity = function(value) {
         return value;
+    };
+
+    _.property = function(path) {
+        if(!_.isArrayLike(path)) {
+            return shallowProperty(path);
+        } else {
+            return _.deepGet(path)
+        }
+    }
+
+    _.deepGet = function(propArray) {
+        return function(obj) {
+            if(_.isObject(obj)) {
+                for (var i = 0; i < propArray.length; i++) {
+                    obj && (obj = obj[propArray[i]]);
+                }
+                return obj;
+            }
+            return;
+        }
     }
 
     _.matcher = function(attrs) {
@@ -165,6 +186,48 @@
 
     }
 
+    _.every = function(list, iteratee, context) {
+        iteratee = cb(iteratee, context);
+        var isArray = _.isArrayLike(list);
+        var i, keys;
+        if (isArray) {
+            for(i = 0; i < list.length; i++) {
+                if (!iteratee(i, list[i], list)) {
+                    return false;
+                }
+            }
+        } else {
+            keys = _.keys(list);
+            for (i = 0; i < keys.length; i++) {
+                if(!iteratee(keys[i], list[keys[i]], list)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+
+    _.some = function (list, iteratee, context) {
+        iteratee = cb(iteratee, context);
+        var isArray = _.isArrayLike(list);
+        var i, keys;
+        if (isArray) {
+            for (i = 0; i < list.length; i++) {
+                if (iteratee(i, list[i], list)) {
+                    return true;
+                }
+            }
+        } else {
+            keys = _.keys(list);
+            for (i = 0; i < keys.length; i++) {
+                if (iteratee(keys[i], list[keys[i]], list)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
     _.extends = _.assign =  function(target) {
         var length = arguments.length;
         if(length < 2 || target == null) return target;
@@ -191,17 +254,39 @@
         return arr.sort(); /* 这里真的有必要sort？ */
     };
 
-    _.isFunction = function(func) {
+    _.wrapperByArgsNumber = function(fn, mode) {
+        return function(target) {
+            if (arguments.length <= 1) {
+                return fn.call(null, target);
+            } else {
+                if(mode === !0) {
+                    return _.every(arguments, function (i, arg) {
+                        return fn.call(null, arg);
+                    })
+                } else {
+                    return _.some(arguments, function (i, arg) {
+                        return fn.call(null, arg);
+                    })
+                }
+            }
+        }
+    };
+
+    _.isFunction = _.wrapperByArgsNumber(function (func) {
         return typeof func === 'function' || false;
-    }
+    }, true);
 
-    _.isObject = function(obj) {
+    _.isNumber = _.wrapperByArgsNumber(function (num) {
+        return typeof (num) === 'number' || toString.call(num) == '[object Number]';
+    }, true);
+
+    _.isObject = _.wrapperByArgsNumber(function (obj) {
         return typeof obj == 'object' && toString.call(obj) == '[object Object]';
-    }
+    }, true);
 
-    _.isArray = function (obj) {
+    _.isArray = _.wrapperByArgsNumber(function (obj) {
         return nativeIsArray && nativeIsArray(obj) || toString.call(obj) == '[object Array]';
-    }
+    }, true);
 
     var shallowProperty = function(prop) {
         return function(obj) {
@@ -209,16 +294,16 @@
         }
     }
 
-    _.isArrayLike = function(obj) {
+    _.isArrayLike = _.wrapperByArgsNumber(function (obj) {
         var isArray = Array.isArray;
-        if(isArray) 
+        if (isArray)
             return isArray(obj);
         else {
             var length = shallowProperty('length')(obj);
-            if(0 <= length && MAX_ARRAY_INDEX >= length) return true;
+            if (0 <= length && MAX_ARRAY_INDEX >= length) return true;
         }
         return false;
-    }
+    }, true);
 
     var has = function(obj, prop) {
         return hasOwnProperty.call(obj, prop);
@@ -314,7 +399,7 @@
                 result= fn.apply(context, args);
                 previous = now;
                 return result;
-                
+
             } else if(!timer && options.trailing !== false) {
                 // trailing effect caused by setTimeout
                 timer = setTimeout(function() {
@@ -337,7 +422,85 @@
                 trailing: true
             };
         };
+    };
+
+    _.once = function(fn) {
+        return function() {
+            var context = this;
+            var args = [].slice.call(arguments);
+            var result;
+            if(fn) {
+                result = fn.apply(context, args);
+                fn = null;
+                return result;
+            }
+        }
+    };
+
+    _.after = function(count, fn) {
+        var initCount = 0;
+        if (!_.isNumber(count)) return noop;
+        return function() {
+            var context = this;
+            var args = [].slice.call(arguments);
+            initCount++;
+            if (initCount === count && fn) {
+                var result = fn.apply(context, args);
+                fn = null;
+                return result;
+            }
+        }
+    };
+
+    _.before = function(count, fn) {
+        var initCount = 0;
+        if (!_.isNumber(count)) return noop;
+        return function () {
+            var context = this;
+            var args = [].slice.call(arguments);
+            initCount++;
+            if (initCount <= count && fn) {
+                var result = fn.apply(context, args);
+                return result;
+            } else {
+                fn = null;
+            }
+        }
+    };
+
+    _.wrap = function(fn, wrapper) {
+        if(!_.isFunction(fn, wrapper)) return noop;
+        return function() {
+            return wrapper(fn);
+        }
     }
+
+    //negate the type not the value ?
+    _.negate = function(type) {
+        return _.wrapperByArgsNumber(function (target) {
+            if (_.isFunction(type)) {
+                try {
+                    //however, is something hasn't constructor ?
+                    if (target === undefined) return false;
+                    return target.constructor === type
+                } catch (error) {
+                    return target == undefined                        
+                }
+            }
+            try {
+                type = type.prototype.constructor
+            } catch (error) {
+                type = undefined;
+            }
+            if (type !== undefined) {
+                console.log(target.prototype.constructor, type);
+                return target.prototype.constructor === type
+            } else {
+                return target == type;
+            }
+        }, true)
+    };
+
 
     _.onceLog = function (...args) {
         if (logOnce) return;
