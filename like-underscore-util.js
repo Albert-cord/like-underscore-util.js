@@ -476,7 +476,9 @@
     }
 
     //negate the type not the value ?
-    _.negate = function(type) {
+    //But undefined and null and NaN is not to negate
+    //Number and NaN is not to negate
+    _.negateType = function(type) {
         return _.wrapperByArgsNumber(function (target) {
             if (_.isFunction(type)) {
                 try {
@@ -500,6 +502,45 @@
             }
         }, true)
     };
+
+    _.negate = function(predicate) {
+        return _.wrapperByArgsNumber(function () {
+            return !predicate.apply(this, arguments);
+        }, true);
+    };
+
+    var restArguments = function(fn) {
+        var length = fn && fn.length ||0;
+        return function() {
+            if (length >= arguments.length && length != 1) {
+                return fn.apply(this, arguments);
+            } else {
+                var args = Array(length);
+                for(var i = 0; i < length - 1; i++) {
+                    args[i] = arguments[i];
+                }
+                args[i] = [].slice.call(arguments, length - 1);
+
+                return fn.apply(this, args);
+            }
+        }
+    }
+
+    _.restArguments = restArguments;
+
+    _.compose = _.restArguments(function (fns) {
+        return _.restArguments(function (args) {
+            var ret;
+            var i = fns.length - 1
+            console.log(args);
+            i >= 0 &&　(ret = fns[i].apply(this, args));
+            for (var i = fns.length - 2; i >= 0; i--) {
+                console.log(ret);
+                ret = fns[i].call(this, ret);
+            }
+            return ret;
+        })
+    })
 
 
     _.onceLog = function (...args) {
