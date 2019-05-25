@@ -72,6 +72,27 @@
         }
 
     }
+    //how to fix lost closure value
+    var restArguments = function(fn) {
+        var length = fn && fn.length || 0;
+        //to fix lost closure value
+        var closureArgs = [].slice.call(arguments, 1);
+        return function() {
+            if (length >= arguments.length && length != 1) {
+                // return fn.apply(this, [].slice.call(arguments));
+                return fn.bind(this, [].slice.call(arguments)).apply(this,closureArgs);
+            } else {
+                var args = Array(length);
+                for(var i = 0; i < length - 1; i++) {
+                    args[i] = arguments[i];
+                }
+                args[i] = [].slice.call(arguments, length - 1);
+
+                // return fn.apply(this, args);
+                return fn.bind(this, args).apply(this, closureArgs);
+            }
+        }
+    }
 
     _.identity = function(value) {
         return value;
@@ -98,7 +119,7 @@
     }
 
     _.matcher = function(attrs) {
-        attrs = _.extends({}, atrrs);
+        attrs = _.extend({}, atrrs);
         return function(obj) {
             return _.isMatch(obj, attrs);
         }
@@ -170,7 +191,7 @@
 
     _.map = function (list, iteratee, context) {
         iteratee = cb(iteratee, context);
-        var isArray = _.isArrayLike(obj);
+        var isArray = _.isArrayLike(list);
         var i;
         var result = [];
         if (isArray) {
@@ -182,7 +203,9 @@
             for (i = 0; i < keys.length; i++) {
                 result.push(iteratee(list[keys[i]], i, list));
             }
-        }    
+        }
+        
+        return result;
 
     }
 
@@ -228,21 +251,49 @@
         return false;
     };
 
-    _.extends = _.assign =  function(target) {
-        var length = arguments.length;
-        if(length < 2 || target == null) return target;
-        var deep = 'boolean' === typeof arguments[1] ? arguments[1] : 'nope';
-        var i = 'nope' === deep ? 1 : 2;
-        deep = 'nope' === deep ? false : deep;
-        for(; i < length; i++) {
-            for(var prop in arguments[i]) {
-                if (has(arguments[i], prop) && (!target[prop] || deep)) {
-                    target[prop] = arguments[i][prop];
+
+
+    // double closure will cause args undefined
+    var createAssigner = function(keysFn, isOverride) {
+        keysFn = keysFn;
+        isOverride = isOverride;
+        return restArguments(function (obj, args, keysFn, isOverride) {
+            // why underscore use under
+            // if(!isOverride) obj = Object(obj)
+            if(args.length === 0 || obj === void 0) return obj;
+            _.each(args, function(source, i, sources) {
+                var keys = keysFn(source);
+                for(var i = 0, key; i < keys.length, key = keys[i]; i++) {
+                    if(isOverride || obj[key] === void 0) {
+                        obj[key] = source[key];
+                    }
                 }
-            }
-        }
-        return target;
+            })
+        })
     }
+
+    //why not wrap a function to Aop and to void check arguments[1]'s value
+    //to do it.
+    // _.extends = _.assign =  function(target) {
+    //     var length = arguments.length;
+    //     if(length < 2 || target == null) return target;
+    //     var deep = 'boolean' === typeof arguments[1] ? arguments[1] : 'nope';
+    //     var i = 'nope' === deep ? 1 : 2;
+    //     deep = 'nope' === deep ? false : deep;
+    //     for(; i < length; i++) {
+    //         for(var prop in arguments[i]) {
+    //             if (has(arguments[i], prop) && (!target[prop] || deep)) {
+    //                 target[prop] = arguments[i][prop];
+    //             }
+    //         }
+    //     }
+    //     return target;
+    // }
+    
+
+    _.extend = createAssigner(_.allKeys, true);
+    
+    _.extendOwn = createAssigner(_.keys, true);
 
     _.functions = function(obj) {
         var arr = [];
@@ -309,7 +360,7 @@
         return hasOwnProperty.call(obj, prop);
     };
     _.keys = _.objects = function(obj) {
-        if(_.isObject(obj)) return [];
+        if(!_.isObject(obj)) return [];
         var keys = Object.keys;
         if(keys) {
             return keys(obj);
@@ -324,7 +375,7 @@
     }
 
     _.allKeys = _.allObjects = function (obj) {
-        if (_.isObject(obj)) return [];
+        if (!_.isObject(obj)) return [];
         var keys = Object.keys;
         if (keys) {
             return keys(obj);
@@ -335,6 +386,70 @@
         }
         return arr;
     }
+
+    _.values = function(obj) {
+        var keys = _.keys(obj);
+        var result = [];
+        if(keys.length === 0) return result;
+        return _.map(keys, function(key) {
+            return obj[key];
+        })
+    }
+
+    _.mapObject = function(obj, iteratee, context) {
+        iteratee = cb(iteratee, context);
+        // var result = {};
+        var result = Object.create(null);
+        var keys = _.keys(obj);
+        _.each(keys, function(key, i, keys) {
+            result[key] = iteratee(obj[key], key, obj);
+        })
+        return result;
+    }
+
+    _.pairs =  function (obj) {
+        var result = [];
+        var keys = _.keys(obj);
+        // var pair = [];
+        if(keys.length === 0) return result;
+        _.each(keys, function(key, i) {
+            result.push([key, obj[key]]);
+        })
+        return result;
+    }
+
+    //how to serializable the val of the key;
+    _.invert = function (obj) {
+        var result = Object.create(null);
+        var keys = _.keys(obj);
+        if(keys.length === 0) return result;
+        _.each(keys, function(key, i) {
+            result[obj[key]] = key;
+        })
+        return result;
+    }
+
+    _.create = function (prototype, props) {
+        var result = Object.create(prototype || null);
+        var keys = _.keys(props);
+        if(keys.length === 0) return result;
+        _.each(keys, function(key, i) {
+            result[key] = props[key];
+        })
+        return result;
+    }
+
+    _.findKey = function (obj, predicate, context) {
+        predicate = cb(predicate, context);
+        var keys = _.keys(obj);
+        if(keys.length === 0) return;
+        for(var i = 0; i < keys.length; i++) {
+            if(predicate(obj[key[i]], key[i], obj)) {
+                return key[i];
+            }
+        }
+    }
+
 
     _.debounce = function(fn, delay, immediate) {
         var timer = null;
@@ -509,22 +624,7 @@
         }, true);
     };
 
-    var restArguments = function(fn) {
-        var length = fn && fn.length ||0;
-        return function() {
-            if (length >= arguments.length && length != 1) {
-                return fn.apply(this, arguments);
-            } else {
-                var args = Array(length);
-                for(var i = 0; i < length - 1; i++) {
-                    args[i] = arguments[i];
-                }
-                args[i] = [].slice.call(arguments, length - 1);
 
-                return fn.apply(this, args);
-            }
-        }
-    }
 
     _.restArguments = restArguments;
 
