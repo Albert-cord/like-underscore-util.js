@@ -19,6 +19,7 @@
     
     var ArrayProto = Array.prototype;
     var push = ArrayProto.push;
+    var slice = ArrayProto.slice;
 
     var ObjectProto = Object.prototype;
     var toString = ObjectProto.toString;
@@ -31,7 +32,7 @@
         return cb(value, context);
     }
     var noop = function() {};
-
+    var log = console.log.bind();
     var logOnce = false;
 
     var cb = function(value, context, argCount) {
@@ -72,15 +73,13 @@
         }
 
     }
-    //how to fix lost closure value
+
     var restArguments = function(fn) {
         var length = fn && fn.length || 0;
-        //to fix lost closure value
-        var closureArgs = [].slice.call(arguments, 1);
+
         return function() {
             if (length >= arguments.length && length != 1) {
-                // return fn.apply(this, [].slice.call(arguments));
-                return fn.bind(this, [].slice.call(arguments)).apply(this,closureArgs);
+                return fn.apply(this, [].slice.call(arguments));
             } else {
                 var args = Array(length);
                 for(var i = 0; i < length - 1; i++) {
@@ -88,8 +87,7 @@
                 }
                 args[i] = [].slice.call(arguments, length - 1);
 
-                // return fn.apply(this, args);
-                return fn.bind(this, args).apply(this, closureArgs);
+                return fn.apply(this, args);
             }
         }
     }
@@ -116,6 +114,27 @@
             }
             return;
         }
+    }
+
+    _.propertyOf = function(obj) {
+        if(!_.isObject(obj)) return noop;
+        return function(path) {
+            if(!_.isArrayLike(path)) return obj[path];
+            _.each(path, function (p, i, path) {
+                obj && (obj = obj[p]);
+            })
+            return obj;
+        }
+    }
+
+    _.isEqual = function (obj, other) {
+        // how to easy to check isEqual?
+        // only property ?or prototype ? 
+        if(_.isObject(obj, other)) {
+            // var objKeys = _.
+            // return obj == other || ()()            
+        }
+
     }
 
     _.matcher = function(attrs) {
@@ -255,11 +274,11 @@
 
     // double closure will cause args undefined
     var createAssigner = function(keysFn, isOverride) {
-        keysFn = keysFn;
-        isOverride = isOverride;
-        return restArguments(function (obj, args, keysFn, isOverride) {
+        return function (obj) {
             // why underscore use under
-            // if(!isOverride) obj = Object(obj)
+            // to change the primite to object
+            if(!isOverride) obj = Object(obj);
+            var args = slice.call(arguments, 1);
             if(args.length === 0 || obj === void 0) return obj;
             _.each(args, function(source, i, sources) {
                 var keys = keysFn(source);
@@ -269,7 +288,8 @@
                     }
                 }
             })
-        })
+            return obj;
+        }
     }
 
     //why not wrap a function to Aop and to void check arguments[1]'s value
@@ -291,9 +311,6 @@
     // }
     
 
-    _.extend = createAssigner(_.allKeys, true);
-    
-    _.extendOwn = createAssigner(_.keys, true);
 
     _.functions = function(obj) {
         var arr = [];
@@ -386,6 +403,77 @@
         }
         return arr;
     }
+
+    _.extend = createAssigner(_.allKeys, true);
+    
+    _.extendOwn = createAssigner(_.keys, true);
+
+    // how to make a pretty function to create pick and omit? 
+    // var createPickOmitFn = function(isPickFn) {
+
+    // }
+
+    _.pick = restArguments(function(obj, keys) {
+        var keyArr = _.keys(obj), iteratee, result = Object.create(null);
+        if(typeof keys === 'function') {
+            iteratee = keys;
+            
+            _.each(keyArr, function(key, i, keyArr) {
+                if(iteratee(obj[key], key, obj)) result[key] = obj[key];
+            });
+        } else {
+            keys = typeof keys === 'string' ? Array(keys) : keys;
+
+            _.each(keys, function(key, i, keys) {
+                if(keyArr.indexOf(key) !== -1) {
+                    result[key] = obj[key];
+                }
+            })
+        }
+        return result;
+    })
+
+    _.omit = restArguments(function(obj, keys) {
+        var keyArr = _.keys(obj), iteratee, result = Object.create(null);
+        if(typeof keys === 'function') {
+            iteratee = keys;
+            
+            _.each(keyArr, function(key, i, keyArr) {
+                if(!iteratee(obj[key], key, obj)) result[key] = obj[key];
+            });
+        } else {
+            keys = typeof keys === 'string' ? Array(keys) : keys;
+            _.each(keys, function(key, i, keys) {
+                if(keyArr.indexOf(key) == -1) {
+                    result[key] = obj[key];
+                }
+            })
+        }
+        return result;
+    })
+
+    _.defaults = restArguments(function (obj, args) {
+        return createAssigner(_.keys, false)(obj, args)
+    });
+
+    _.clone = function (obj) {
+        if(_.isObject(obj)) {
+            return _.extend({}, obj);
+        }
+        if(_.isArray(obj)) {
+            return obj.slice();
+        }
+        return obj;
+    };
+
+    _.tap = function (obj, interceptor) {
+        interceptor = cb(interceptor);
+        //the interceptor will influence obj ?
+        if(_.isObject(obj) || _.isArrayLike(obj)) interceptor(obj);
+        return obj;
+    }
+
+
 
     _.values = function(obj) {
         var keys = _.keys(obj);
