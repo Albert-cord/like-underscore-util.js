@@ -127,16 +127,6 @@
         }
     }
 
-    _.isEqual = function (obj, other) {
-        // how to easy to check isEqual?
-        // only property ?or prototype ? 
-        if(_.isObject(obj, other)) {
-            // var objKeys = _.
-            // return obj == other || ()()            
-        }
-
-    }
-
     _.matcher = function(attrs) {
         attrs = _.extend({}, atrrs);
         return function(obj) {
@@ -340,13 +330,26 @@
         }
     };
 
-    _.isFunction = _.wrapperByArgsNumber(function (func) {
-        return typeof func === 'function' || false;
-    }, true);
+    _.isObjectTypeFn = function (typeStr) {
+        return function(target) {
+            return toString.call(target) === '[object ' + typeStr + ']';
+        }
+    }
 
-    _.isNumber = _.wrapperByArgsNumber(function (num) {
-        return typeof (num) === 'number' || toString.call(num) == '[object Number]';
-    }, true);
+    _.each(['Arguments', 'Function', 'String', 
+    'Number', 'Date', 'Symbol', 
+    'RegExp', 'Error', 'Map', 
+    'WeakMap', 'Set', 'WeakSet'], function (params) {
+        _[params] = _.wrapperByArgsNumber(_.isObjectTypeFn(params), true);
+    })
+
+    // _.isFunction = _.wrapperByArgsNumber(function (func) {
+    //     return typeof func === 'function' || false;
+    // }, true);
+
+    // _.isNumber = _.wrapperByArgsNumber(function (num) {
+    //     return typeof (num) === 'number' || toString.call(num) == '[object Number]';
+    // }, true);
 
     _.isObject = _.wrapperByArgsNumber(function (obj) {
         return typeof obj == 'object' && toString.call(obj) == '[object Object]';
@@ -356,6 +359,49 @@
         return nativeIsArray && nativeIsArray(obj) || toString.call(obj) == '[object Array]';
     }, true);
 
+    _.isObjectLike = _.wrapperByArgsNumber(function (obj) {
+        return typeof obj === 'object' && obj !== null;
+    }, true)
+
+    _.isDeepEqual = function (obj, other) {
+        // how to easy to check isEqual?
+        // only property ?or prototype ?
+        // to check prototype chain 
+        if(_.isObject(obj, other)) {
+
+            return obj == other || (function(obj, other) {
+                var checkedObj = [];
+                var objKeys = _.allKeys(obj);
+                var otherKeys = _.allKeys(other);
+                log(objKeys, otherKeys)
+                if(objKeys.length !== otherKeys.length) return false;
+                for(var i = 0, o, ot; i < objKeys.length, o = obj[objKeys[i]], ot = other[otherKeys[i]]; i++) {
+                    if(checkedObj.indexOf(o) !== -1 && checkedObj.indexOf(o) !== -1 && o != ot) {
+                        checkedObj = null;
+                        return false;
+                    } 
+                    if(_.isObjectLike(o, ot) && (checkedObj.push(o, ot), !_.isDeepEqual(o, ot))) {
+                        checkedObj = null;                        
+                        return false;
+                    } else {
+                        checkedObj = null;
+                        if(!_.isObjectLike(o) && !_.isObjectLike(ot) && ot !== o) {
+                            checkedObj = null;
+                            return false
+                        } else {
+                            checkedObj = null;
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            })(obj, other)        
+        } else {
+            return obj === other;
+        }
+
+    }
+
     var shallowProperty = function(prop) {
         return function(obj) {
             return  obj && obj[prop];
@@ -363,6 +409,14 @@
     }
 
     _.isArrayLike = _.wrapperByArgsNumber(function (obj) {
+        if(typeof obj === 'object' && obj !== null) {
+            var length = shallowProperty('length')(obj);
+            if (0 <= length && MAX_ARRAY_INDEX >= length) return true;
+        }
+        return false;
+    })
+
+    _.isArray = _.wrapperByArgsNumber(function (obj) {
         var isArray = Array.isArray;
         if (isArray)
             return isArray(obj);
@@ -376,6 +430,66 @@
     var has = function(obj, prop) {
         return hasOwnProperty.call(obj, prop);
     };
+
+    _.isEmpty = _.wrapperByArgsNumber(function (obj) {
+        if(_.isArrayLike(obj)) {
+            for(var prop in obj) {
+                if(has(obj, prop)) {
+                    if(prop !== 'length') return false;
+                }
+            }
+            return obj.length === 0;
+        }
+        if(_.isObject(obj)) {
+            for(var prop in obj) {
+                if(has(obj, prop)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    });
+
+    _.isElement = _.wrapperByArgsNumber(function (node) {
+        if(typeof HTMLElement === 'object') return node instanceof HTMLElement;
+        return _.isObjectLike(node) && node.nodeType === 1 && typeof node.nodeName === 'string'
+    });
+
+//    _.isArguments = _.wrapperByArgsNumber(function (args) {
+//     return _.isArrayLike(args) && (typeof args.callee === 'function')
+//     }, true);
+
+    // _.isString = _.wrapperByArgsNumber(function (str) {
+    //     return typeof str === 'string' || _.isObjectTypeFn('String')(str);
+    // }, true);
+
+    _.isNaN = function (num) {
+        if(isNaN) return _.isNumber(num) && isNaN(num);
+        return num !== num;
+    }
+
+    // _.isSymbol = function (symbol) {
+    //     return typeof symbol === 'symbol' || _.isObjectTypeFn('Symbol')(symbol);
+    // }
+    //why parseFloat num?
+    _.isFinite = function (num) {
+        return !_.isSymbol(num) && isFinite(num) && !isNaN(parseFloat(num));
+    }
+
+    _.isBoolean = function (boolean) {
+        return typeof boolean === 'boolean' || _.isObjectTypeFn('Boolean')(boolean);
+    }
+
+    _.isNull = function (obj) {
+        return obj === null;
+    };
+
+    _.isUndefined = function (obj) {
+        return obj === undefined;
+    }
+
+
+
     _.keys = _.objects = function(obj) {
         if(!_.isObject(obj)) return [];
         var keys = Object.keys;
