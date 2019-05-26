@@ -340,7 +340,7 @@
     'Number', 'Date', 'Symbol', 
     'RegExp', 'Error', 'Map', 
     'WeakMap', 'Set', 'WeakSet'], function (params) {
-        _[params] = _.wrapperByArgsNumber(_.isObjectTypeFn(params), true);
+        _['is' + params] = _.wrapperByArgsNumber(_.isObjectTypeFn(params), true);
     })
 
     // _.isFunction = _.wrapperByArgsNumber(function (func) {
