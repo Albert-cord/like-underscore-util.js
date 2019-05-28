@@ -777,7 +777,154 @@
     }
 
     _.contains = function (list, value, fromIndex) {
-        
+        var values, index;
+        if(_.isArray(list)) {
+            fromIndex = fromIndex > 0 ? Math.min(fromIndex, list.length - 1) : 0;
+            index = list.indexOf(value);
+            if(index >= fromIndex) return true;
+        } else {
+            values = _.values(list);
+            fromIndex = fromIndex > 0 ? Math.min(fromIndex, values.length - 1) : 0;
+            index = values.indexOf(value);
+            if(index >= fromIndex) return true;
+        }
+        return false;
+    }
+
+    _.invoke = restArguments(function(list, methodName, args) {
+        var result = _.isArray(list) ? [] : {};
+
+        _.each(list, function (val, index, list) {
+            // other variable how to operation ?
+            typeof val[methodName] === 'function' && (result[index] = val[methodName].apply(null, args));
+        })
+
+        return result;
+    });
+
+    _.pluck = function (list, propertyName) {
+        var result = [];
+        if(_.isArray(list)) {
+            _.each(list, function(val, index, list) {
+                if(_.isObject(val)) {
+                    val[propertyName] && (result.push(val));
+                }
+            })
+        }
+        return result;
+    }
+
+    _.max = function(list, iteratee, context) {
+        var maxVal = -Infinity, max, current;
+        if(_.isEmpty(list)) return maxVal;
+        if(_.isArray(list)) {
+            iteratee = cb(iteratee, context);
+            _.each(list, function(val, index, list) {
+                current = iteratee(val);
+                if(current > maxVal) {
+                    maxVal = current;
+                    max = val;
+                }
+            })
+        }
+        return max || maxVal;
+    }
+
+    _.min = function(list, iteratee, context) {
+
+        var minVal = Infinity, min, current;
+        if(_.isEmpty(list)) return minVal;
+        if(_.isArray(list)) {
+            iteratee = cb(iteratee, context);
+            _.each(list, function(val, index, list) {
+                current = iteratee(val);
+                if(current < minVal) {
+                    minVal = current;
+                    min = val;
+                }
+            })
+        }
+        return min || minVal;
+    }
+
+    _.sortBy = function(list, iteratee, context) {
+        var index = 0;
+        iteratee = cb(iteratee, context);
+        return _.pluck(_.map(list, function(val, idx, list){
+            return {
+                value: val,
+                index: index++,
+                criteria: iteratee(val, idx, list)
+            }
+        }).sort(function(left, right) {
+            var a = left.criteria;
+            var b = right.criteria;
+
+            if(a !== b) {
+                // why a null ?
+                if(a > b || a == void 0) return 1;
+                if(a < b || b == void 0) return -1;
+            }
+            return left.index - right.index;
+        }), 'value')
+    }
+
+    var group = function(behaviorFn) {
+        return function(list, iteratee, context) {
+            var ret = {}, key;
+            iteratee = cb(iteratee, context);
+    
+            _.each(list, function(val, idx, list) {
+                key = iteratee(val, idx, list);
+                behaviorFn(key, ret, val)
+            })
+    
+            return ret;
+        }
+    }
+
+    _.groupBy = group(function(key, ret, val) {
+        if(has(ret, key)) {
+            ret[key].push(val);
+        } else {
+            ret[key] = [val];
+        }
+    })
+
+    _.indexBy = group(function(key, ret, val) {
+        ret[key] = val;
+    });
+
+    _.countBy = group(function(key, ret, val) {
+        if(has(ret, key)) {
+            ret[key]++
+        } else {
+            ret[key] = 1;
+        }
+    });
+
+    _.sample = function(list, n, isOnlyOne) {
+        if(n == null || isOnlyOne) {
+            if(!_.isArrayLike(list)) list = _.values(list);
+            return list[_.random(list.length)];
+        }
+        if(!_.isArrayLike(list)) list = _.values(list);
+        else list = _.clone(list);
+        var j, temp, length = list.length;
+        n = Math.max(Math.min(n, length), 0);
+        for(var i = 0; i < length; i++) {
+            // j = _.random(0, length - i);
+            j = _.random(i, length - 1);
+            temp = list[i];
+            list[i] = list[j];
+            list[j] = temp;
+        }
+
+        return list.slice(0, n);
+    }
+
+    _.shuffle = function(list) {
+        return _.sample(list, Infinity);
     }
 
     _.findKey = function (obj, predicate, context) {
@@ -791,7 +938,55 @@
         }
     }
 
+    _.toArray = function(anything) {
+        if(_.isObject(anything)) return _.values(anything);
+        if(_.isArrayLike(anything)) return _.clone(anything);
+        return [anything];
+    }
 
+    _.size = function(list) {
+        if(_.isObject(list)) return _.values(list).length;
+        if(_.isArrayLike(list)) return list.length;
+        return;
+    }
+
+    _.partition = function(list, iteratee) {
+        iteratee = cb(iteratee);
+        var ret, keys;
+        if(_.isObject(list)) {
+            ret = [{}, {}]
+            keys = _.keys(list);
+            _.each(keys, function(key, i, keys) {
+                if(iteratee(list[key], key, list)) {
+                    ret[0][key] = list[key];
+                } else {
+                    ret[1][key] = list[key];
+                }
+            })
+            return ret;
+        }
+        if(_.isArray(list)) {
+            ret = [[], []]
+            list = _.clone(list);
+            _.each(list, function(val, key, list) {
+                if(iteratee(val, key, list)) {
+                    ret[0].push(val);
+                } else {
+                    ret[1].push(val);
+                }
+            })
+            return ret;
+        }
+        return [[], []];
+    }
+
+    _.compact = function(list) {
+        return _.partition(list, !_.negate(Boolean))[0];
+    }
+
+    _.first = function(list, n) {
+        
+    }
     _.debounce = function(fn, delay, immediate) {
         var timer = null;
         var immediate = immediate || false;
