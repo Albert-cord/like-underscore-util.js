@@ -8,6 +8,7 @@
         this._wrapped = obj;
     }
 
+
     if(typeof exports !== 'undefined' && !exports.nodeType) {
         if(typeof module !== 'undefined' && !module.nodeType && module.exports) {
             exports = module.exports = _;
@@ -16,6 +17,8 @@
     } else {
         root._ = _;
     }
+
+    var defaultLikeUnderscoreUtil = root._;
     
     var ArrayProto = Array.prototype;
     var push = ArrayProto.push;
@@ -74,6 +77,12 @@
 
     }
 
+    var shallowProperty = function (prop) {
+        return function (obj) {
+            return obj && obj[prop];
+        }
+    }
+
     var restArguments = function(fn) {
         var length = fn && fn.length || 0;
 
@@ -91,6 +100,32 @@
             }
         }
     }
+
+    _.wrapperByArgsNumber = function (fn, mode) {
+        return function (target) {
+            if (arguments.length <= 1) {
+                return fn.call(null, target);
+            } else {
+                if (mode === !0) {
+                    return _.every(arguments, function (i, arg) {
+                        return fn.call(null, arg);
+                    })
+                } else {
+                    return _.some(arguments, function (i, arg) {
+                        return fn.call(null, arg);
+                    })
+                }
+            }
+        }
+    };
+
+    _.isArrayLike = _.wrapperByArgsNumber(function (obj) {
+        if (typeof obj === 'object' && obj !== null) {
+            var length = shallowProperty('length')(obj);
+            if (0 <= length && MAX_ARRAY_INDEX >= length) return true;
+        }
+        return false;
+    })
 
     _.identity = function(value) {
         return value;
@@ -138,6 +173,7 @@
         if (!_.isObject(obj) && !_.isArrayLike(obj)) return false;
         for(var prop in attrs) {
             if(has(attrs, prop)) {
+                // how it works on reference type?
                 if(!obj[prop] && obj[prop] !== attrs[prop]) return false;
             }
         }
@@ -150,7 +186,7 @@
         return instance._chains ? _(obj).chains() : obj;
     }
 
-    _.mixins = function(obj) {
+    _.mixin = function(obj) {
         _.each(_.functions(obj), function(funName, index, arr) {
             var func = _[funName] = obj[funName];
             _.prototype[funName] = function() {
@@ -260,26 +296,53 @@
         return false;
     };
 
+    _.flatten = function(arr) {
 
+    }
+
+    var createReduceFn = function (step) {
+        
+        return function (list, iteratee, initVariable, context) {
+            iteratee = cb(iteratee, context, 4);
+            var i = step > 0 ? 0 : list.length - 1;
+            if (initVariable == undefined) {
+                initVariable = list[i];
+                i += step;
+            }
+
+            for (; i >= 0 && i < list.length; i += step) {
+                initVariable = iteratee(initVariable, list[i], i, list);
+            }
+            
+            return initVariable;
+        }
+    }
+
+    _.reduce = _.inject = _.foldl = createReduceFn(1);
+
+    _.reduceRight = _.foldr = createReduceFn(-1);
 
     // double closure will cause args undefined
     var createAssigner = function(keysFn, isOverride) {
-        return function (obj) {
+        return restArguments(function (obj, args) {
             // why underscore use under
             // to change the primite to object
-            if(!isOverride) obj = Object(obj);
-            var args = slice.call(arguments, 1);
-            if(args.length === 0 || obj === void 0) return obj;
-            _.each(args, function(source, i, sources) {
+            if (!isOverride) obj = Object(obj);
+
+            // var args = arguments.slice(1);
+            // to create a variable to save ?
+            // var args = slice.call(arguments, 1);
+            if (typeof args == 'undefined' || args.length === 0 || obj === void 0) return obj;
+            _.each(args, function (source, i, sources) {
                 var keys = keysFn(source);
-                for(var i = 0, key; i < keys.length, key = keys[i]; i++) {
-                    if(isOverride || obj[key] === void 0) {
+                for (var i = 0, key; i < keys.length, key = keys[i]; i++) {
+                    if (isOverride || obj[key] === void 0) {
                         obj[key] = source[key];
                     }
                 }
             })
             return obj;
-        }
+        })
     }
 
     //why not wrap a function to Aop and to void check arguments[1]'s value
@@ -310,24 +373,6 @@
             }
         }
         return arr.sort(); /* 这里真的有必要sort？ */
-    };
-
-    _.wrapperByArgsNumber = function(fn, mode) {
-        return function(target) {
-            if (arguments.length <= 1) {
-                return fn.call(null, target);
-            } else {
-                if(mode === !0) {
-                    return _.every(arguments, function (i, arg) {
-                        return fn.call(null, arg);
-                    })
-                } else {
-                    return _.some(arguments, function (i, arg) {
-                        return fn.call(null, arg);
-                    })
-                }
-            }
-        }
     };
 
     _.isObjectTypeFn = function (typeStr) {
@@ -373,9 +418,10 @@
                 var checkedObj = [];
                 var objKeys = _.allKeys(obj);
                 var otherKeys = _.allKeys(other);
-                log(objKeys, otherKeys)
                 if(objKeys.length !== otherKeys.length) return false;
-                for(var i = 0, o, ot; i < objKeys.length, o = obj[objKeys[i]], ot = other[otherKeys[i]]; i++) {
+                for(var i = 0, o, ot; i < objKeys.length; i++) {
+                    o = obj[objKeys[i]];
+                    ot = other[otherKeys[i]];
                     if(checkedObj.indexOf(o) !== -1 && checkedObj.indexOf(o) !== -1 && o != ot) {
                         checkedObj = null;
                         return false;
@@ -401,20 +447,6 @@
         }
 
     }
-
-    var shallowProperty = function(prop) {
-        return function(obj) {
-            return  obj && obj[prop];
-        }
-    }
-
-    _.isArrayLike = _.wrapperByArgsNumber(function (obj) {
-        if(typeof obj === 'object' && obj !== null) {
-            var length = shallowProperty('length')(obj);
-            if (0 <= length && MAX_ARRAY_INDEX >= length) return true;
-        }
-        return false;
-    })
 
     _.isArray = _.wrapperByArgsNumber(function (obj) {
         var isArray = Array.isArray;
@@ -566,6 +598,7 @@
         return result;
     })
 
+    // to fix bug: args will be array, but createAssigner cannot to accept only
     _.defaults = restArguments(function (obj, args) {
         return createAssigner(_.keys, false)(obj, args)
     });
@@ -639,6 +672,112 @@
             result[key] = props[key];
         })
         return result;
+    }
+
+    _.find = _.detect = function (list, predicate, context) {
+        predicate = cb(predicate, context);
+        var i;
+        if(_.isArray(list)) {
+            for (i = 0; i < list.length; i++) {
+                if (predicate(list[i], i, list)) {
+                    return list[i];
+                }
+            }
+        } else {
+            var keys = _.keys(list);
+            for (i = 0; i < keys.length; i++) {
+                if (predicate(list[keys[i]], keys[i], list)) {
+                    return list[keys[i]];                    
+                }
+            }
+        }
+        return;
+    }
+
+    _.filter = _.select = function (list, predicate, context) {
+        predicate = cb(predicate, context);
+        var ret, i;
+        if (_.isArray(list)) {
+            ret = [];
+            for (i = 0; i < list.length; i++) {
+                if (predicate(list[i], i, list)) {
+                    ret.push(list[i]);
+                }
+            }
+        } else {
+            ret = {}
+            var keys = _.keys(list);
+            for (i = 0; i < keys.length; i++) {
+                if (predicate(list[keys[i]], keys[i], list)) {
+                    ret[keys[i]] = list[keys[i]];
+                }
+            }
+        }
+        return ret == undefined ? [] : ret;
+    }
+
+    var isObjHasProperties = function (obj, properties, keys) {
+        if(_.isObject(obj)) return false;
+        for (var i = 0, key; i < keys.length; i++) {
+            key = keys[i];
+            if (!obj[key] || obj[key] !== properties[key]) return false;
+        }
+        return true;
+    }
+
+    _.findWhere = function (list, properties) {
+        var keys = _.keys(properties);
+        var i;
+        if(_.isArray(list)) {
+            for(i = 0; i < list.length; i++) {
+                if (isObjHasProperties(list[i], properties, keys)) {
+                    return list[i];
+                }
+            }
+        } else {
+            if (isObjHasProperties(list, properties, keys)) return list;
+        }
+    }
+
+    _.where = function (list, properties) {
+        var keys = _.keys(properties);
+        var i, ret = [];
+        if (_.isArray(list)) {
+            for (i = 0; i < list.length; i++) {
+                if (isObjHasProperties(list[i], properties, keys)) {
+                    ret.push(list[i]);
+                }
+            }
+        } else {
+            if (isObjHasProperties(list, properties, keys)) return [list];
+        }
+        return ret
+    }
+
+    _.reject = function (list, predicate, context) {
+        predicate = cb(predicate, context);
+        var ret, i;
+        if (_.isArray(list)) {
+            ret = [];
+            for (i = 0; i < list.length; i++) {
+                if (!predicate(list[i], i, list)) {
+                    ret.push(list[i]);
+                }
+            }
+        } else {
+            ret = {}
+            var keys = _.keys(list);
+            for (i = 0; i < keys.length; i++) {
+                if (!predicate(list[keys[i]], keys[i], list)) {
+                    ret[keys[i]] = list[keys[i]];
+                }
+            }
+        }
+        return ret == undefined ? [] : ret;
+    }
+
+    _.contains = function (list, value, fromIndex) {
+        
     }
 
     _.findKey = function (obj, predicate, context) {
@@ -812,7 +951,7 @@
                 type = undefined;
             }
             if (type !== undefined) {
-                console.log(target.prototype.constructor, type);
+
                 return target.prototype.constructor === type
             } else {
                 return target == type;
@@ -820,6 +959,8 @@
         }, true)
     };
 
+    // how it work ?
+    // !predicate.apply(this, arguments)
     _.negate = function(predicate) {
         return _.wrapperByArgsNumber(function () {
             return !predicate.apply(this, arguments);
@@ -834,15 +975,190 @@
         return _.restArguments(function (args) {
             var ret;
             var i = fns.length - 1
-            console.log(args);
+            
             i >= 0 &&　(ret = fns[i].apply(this, args));
             for (var i = fns.length - 2; i >= 0; i--) {
-                console.log(ret);
+
                 ret = fns[i].call(this, ret);
             }
             return ret;
         })
-    })
+    });
+
+    _.noConfict = function () {
+        // this cooperation will not cover a variable _ ?
+        root._ = defaultLikeUnderscoreUtil
+        return this;
+        // return defaultLikeUnderscoreUtil;
+    };
+
+    _.constant = function (obj) {
+        var closureVariable = obj;
+        return function() {
+            return closureVariable;
+        }
+    };
+
+    _.times = function (n, iteratee, context) {
+        iteratee = cb(iteratee, context);
+        for(var i = 0; i < n; i++) {
+            iteratee(i+1);
+        }
+    };
+
+    _.random = function (min, max) {
+        if (typeof max === 'undefined') {
+            max = min || 0;
+            min = 0;
+        }
+        return Math.floor(Math.random() * Math.floor(max - min));
+    };
+
+    var uniqueIdNum = 0;
+
+    _.uniqueId = function (prefix) {
+        return ((prefix || '') + uniqueIdNum++);
+    }
+
+    var escapeMap = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#x27;',
+        '`': '&#x60;'
+    }
+
+    var unescapeMap = _.invert(escapeMap);
+
+    var createEscapeFn = function (map) {
+        var changeMatchByMap = function (match) {
+            return map[match];
+        }
+
+        var source = '(?:' + _.keys(map).join('|') + ')';
+        var sourceRegExp  = new RegExp(source);
+        var replaceSourceRegExp = new RegExp(source, 'g');
+
+        return function (string) {
+            string = !string ? '' : '' + string;
+            return sourceRegExp.test(string) ? string.replace(replaceSourceRegExp, changeMatchByMap) : string;
+        }
+    }
+
+    _.escape = createEscapeFn(escapeMap);
+    _.unescape = createEscapeFn(unescapeMap);
+    
+    _.result = function (obj, property, defaultVal) {
+        var ret = _.property(property)(obj);
+        if(ret !== undefined) {
+            return typeof ret === 'function' ? ret.call(obj) : ret;
+        } else {
+            return typeof defaultVal === 'function' ? defaultVal.call(obj) : defaultVal;
+        }
+    }
+
+    _.now = Date.now || function() {
+        return new Date().getTime();
+    }
+
+    _.templateSettings = {
+        evaluate: /<%([\s\S]+?)%>/g,
+        interpolate: /<%=([\s\S]+?)%>/g,
+        // fix bug: not match all <%- %>
+        escape: /<%-([\s\S]+?)%>/g
+    }
+
+    var noMatch = /(.)^/;
+
+    var escapes = {
+        "'": "'",
+        '\\': '\\',
+        '\r': 'r',
+        '\n': 'n',
+        '\u2028': 'u2028',
+        '\u2029': 'u2029'
+    }
+
+    var escapesRexExp = new RegExp(/\\|'|\r|\n|\u2028|\u2029/,'g');
+
+    var replaceEscapes = function (match) {
+        return '\\' + escapes[match];
+    }
+
+    _.template = function (text, settings, oldSettings) {
+        if(!settings && oldSettings) settings = oldSettings;
+
+        settings = _.defaults({}, settings, _.templateSettings);
+        var source = "__source+='";
+        var index = 0;
+
+        // use regexp.source not itself.
+        // why cannot change under sequence?
+        var textRegExp = new RegExp(([(settings.escape || noMatch).source,
+            (settings.interpolate || noMatch).source,
+            (settings.evaluate || noMatch).source, '$']).join('|'), 'g');
+        text.replace(textRegExp, function (match, escape, interpolate, evaluate, offset){
+            source += text.slice(index, offset).replace(escapesRexExp, replaceEscapes);
+            index = offset + match.length;
+            // log(interpolate, escape, evaluate, settings, textRegExp, match, offset)
+
+            // if(evaluate) {
+            //     source += "';\n" + evaluate + "\n__source+='";
+            //     log('evaluate', source)
+            // } else if(interpolate) {
+            //     source += "'+\n((__text=(" + interpolate + "))==null?'':__text)+\n'";
+            //     log('interpolate', source)
+            // } else if(escape) {
+            //     // why not directly use _.escape in the function ?
+            //     // because it will be a calculator text to escape
+            //     // source += "'" + escape ? _.escape(escape) : '' + "'" 
+            //     source += "'+\n((__text=(" + escape + "))==null?'':_.escape(__text))+\n";
+            //     log('escape', source)
+            // }
+
+            // why cannot change under sequence?
+            if(escape) {
+                source += "'+\n((__text=(" + escape + "))==null?'':_.escape(__text))+\n'";
+                // log('escape', source)
+            } else if(interpolate) {
+                source += "'+\n((__text=(" + interpolate + "))==null?'':__text)+\n'";
+                // log('interpolate', source)
+            } else if (evaluate) {
+                source += "';\n" + evaluate + "\n__source+='";
+                // log('evaluate', source)
+            }
+
+            return match;
+        })
+        source += "';\n";
+
+        if(!settings.variable) {
+            source = 'with(obj||{}){\n' + source + '}\n';
+        }
+
+        source = "var __text, __source='',__j=Array.prototype.join," +
+            "print=function(){__source+=__j.call(arguments, '');};\n" +
+            source + 'return __source;\n';
+        
+        var render;
+        try {
+            render = new Function(settings.variable || 'obj', '_', source);
+        } catch (error) {
+            // log(source)
+            error.source = source;
+            throw error;
+        }
+
+        var template = function(data) {
+            return render.call(this, data, _);
+        }
+
+        var arg = settings.variable || 'obj';
+        template.source = 'function(' + arg + ') {\n' + source + '}';
+
+        return template;
+    }
 
 
     _.onceLog = function (...args) {
@@ -870,6 +1186,6 @@
         });
     };
 
-    _.mixins(_);
+    _.mixin(_);
 
 })()
