@@ -17,6 +17,8 @@
     } else {
         root._ = _;
     }
+    
+    _.version = '1.0.0'
 
     var defaultLikeUnderscoreUtil = root._;
     
@@ -35,6 +37,7 @@
         return cb(value, context);
     }
     var noop = function() {};
+    _.noop = noop;
     var log = console.log.bind();
     var logOnce = false;
 
@@ -88,7 +91,12 @@
 
         return function() {
             if (length >= arguments.length && length != 1) {
-                return fn.apply(this, [].slice.call(arguments));
+                // the last one will not be array
+                var args = [].slice.call(arguments);
+                // log(args)
+                args[args.length - 1] = [args[args.length - 1]];
+                // if(args.length === 1) args = [args];
+                return fn.apply(this, args);
             } else {
                 var args = Array(length);
                 for(var i = 0; i < length - 1; i++) {
@@ -162,19 +170,21 @@
         }
     }
 
-    _.matcher = function(attrs) {
-        attrs = _.extend({}, atrrs);
+    _.matcher = _.matches = function(attrs) {
+        attrs = _.extend({}, attrs);
         return function(obj) {
+
             return _.isMatch(obj, attrs);
         }
     }
 
     _.isMatch = function(obj, attrs) {
         if (!_.isObject(obj) && !_.isArrayLike(obj)) return false;
+
         for(var prop in attrs) {
             if(has(attrs, prop)) {
                 // how it works on reference type?
-                if(!obj[prop] && obj[prop] !== attrs[prop]) return false;
+                if(!has(obj, prop) || obj[prop] !== attrs[prop]) return false;
             }
         }
         return true;
@@ -182,8 +192,8 @@
 
 
     var chainsFunc = function(instance, obj) {
-        //according _chains config,why chains function do not bring a params:obj ?
-        return instance._chains ? _(obj).chains() : obj;
+        //according _chain config,why chains function do not bring a params:obj ?
+        return instance._chain ? _(obj).chain() : obj;
     }
 
     _.mixin = function(obj) {
@@ -192,7 +202,7 @@
             _.prototype[funName] = function() {
                 var args = [this._wrapped];
                 // this will cause Maximum call stack size exceeded
-                // this._chains = true;
+                // this._chain = true;
                 push.call(args, arguments);
                 return chainsFunc(this, func.apply(_, args)); /* 这里有必要用_的上下文吗？ */
             }
@@ -200,12 +210,12 @@
         return _;
     }
 
-    _.chains = function(obj) {
+    _.chain = function(obj) {
         // this will cause Maximum call stack size exceeded
         // if(this instanceof _) obj = this._wrapped;
         var instance = _(obj);
-        //open chains config
-        instance._chains = true;
+        //open chain config
+        instance._chain = true;
         return instance;
     }
 
@@ -213,11 +223,15 @@
     // _.value = function() {
     //     return this._wrapped;
     // }
-    _.prototype.value = function () {
+    _.prototype.valueOf = _.prototype.toJSON = _.prototype.value = function () {
         return this._wrapped;
     }
 
-    _.each = function(obj, func, ctx) {
+    _.prototype.toString = function() {
+        return String(this._wrapped);
+    }
+
+    _.each = _.forEach = function(obj, func, ctx) {
         var iteratee = optimizeCb(func, ctx);
         var isArray = _.isArrayLike(obj);
         var i = 0;
@@ -229,12 +243,12 @@
         } else {
             var keys = _.keys(obj);
             for(i = 0; i< keys.length; i++) {
-                iteratee(obj[i], i, obj);
+                iteratee(obj[keys[i]], keys[i], obj);
             }
         }
     }
 
-    _.map = function (list, iteratee, context) {
+    _.map = _.collect = function (list, iteratee, context) {
         iteratee = cb(iteratee, context);
         var isArray = _.isArrayLike(list);
         var i;
@@ -254,7 +268,7 @@
 
     }
 
-    _.every = function(list, iteratee, context) {
+    _.every = _.all = function(list, iteratee, context) {
         iteratee = cb(iteratee, context);
         var isArray = _.isArrayLike(list);
         var i, keys;
@@ -275,7 +289,7 @@
         return true;
     };
 
-    _.some = function (list, iteratee, context) {
+    _.some = _.any = function (list, iteratee, context) {
         iteratee = cb(iteratee, context);
         var isArray = _.isArrayLike(list);
         var i, keys;
@@ -295,10 +309,6 @@
         }
         return false;
     };
-
-    _.flatten = function(arr) {
-
-    }
 
     var createReduceFn = function (step) {
         
@@ -322,6 +332,273 @@
 
     _.reduceRight = _.foldr = createReduceFn(-1);
 
+
+    _.flatten = function (arr, isShallow) {
+
+        if(!_.isArrayLike(arr)) return;
+
+        return _.reduce(arr, function(now, next) {
+            if(isShallow) {
+                return _.isArray(now) ? now.concat(next) : [now].concat(next);
+            } else {
+                return _.isArray(now) ? _.flatten(now).concat(_.isArray(next) ? _.flatten(next) : next)
+                        : [now].concat(_.isArray(next) ? _.flatten(next) : next);
+            }
+        })
+    };
+
+    _.union = restArguments(function (lists) {
+        var ret = [];
+        if (!_.isArrayLike(lists)) return;
+
+        lists = _.flatten(lists, true);
+        _.each(lists, function (val) {
+            if (ret.indexOf(val) === -1) ret.push(val);
+        });
+        return ret;
+    });
+
+    _.intersection = restArguments(function (lists) {
+        if (!_.isArrayLike(lists)) return;
+        return _.reduce(lists, function (now, next) {
+            if (!_.isArrayLike(now)) return _.isArrayLike(next) ? next : [];
+            if (!_.isArrayLike(next)) return _.isArrayLike(now) ? now : [];
+            return _.filter(now, function (val) {
+                return next.indexOf(val) !== -1;
+            })
+        })
+    });
+
+    _.difference = restArguments(function(list, others) {
+        list = _.clone(list);
+        if(!_.isArrayLike(list)) return;
+
+        return _.reduce(others, function(now, next) {
+            if (!_.isArrayLike(now)) return _.isArrayLike(next) ? next : [];
+            if (!_.isArrayLike(next)) return _.isArrayLike(now) ? now : [];
+
+            return _.filter(now, function(val) {
+                return next.indexOf(val) === -1;
+            })
+        }, list)
+        
+    })
+
+    var unzipFn = function (lists) {
+        if (!_.isArrayLike(lists)) return;
+        var ret = [];
+        for (var i = 0; i < lists.length; i++) {
+            var list = lists[i];
+            if (!_.isArrayLike(list)) continue;
+            for (var idx = 0; idx < list.length; idx++) {
+                if (!has(ret, idx)) {
+                    ret[idx] = [list[idx]]
+                } else {
+                    ret[idx].push(list[idx]);
+                }
+            }
+        }
+
+        return ret;
+    }
+
+    var createZipFn = function(isZip) {
+        if(isZip) return restArguments(unzipFn);
+        else return unzipFn;
+    }
+
+    // o(n*n), how to reduce to o(n) ?
+    _.zip = createZipFn(true)
+
+    _.unzip = createZipFn(false);
+
+    _.object = function(keys, values) {
+        var lists, ret = {};
+        if(!values) lists = keys;
+        if(!_.isArrayLike(keys)) return;
+
+        if(!values) {
+            _.each(lists, function(list) {
+                ret[list[0]] = list[1];
+            })
+        } else {
+            lists = _.zip(keys, values);
+            _.each(lists, function (list) {
+                ret[list[0]] = list[1];
+            })
+        }
+        return ret;
+    }
+
+    _.chunk = function(list, length) {
+        if(!length) return list;
+        if(!_.isArrayLike(list)) return;
+        var ret = [];
+        length = typeof length === 'number' ? Math.ceil(length) : 1;
+        length = Math.min(length, list.length);
+        for(var i = 0; i < list.length; i += length) {
+            ret.push(list.slice(i, i + length))
+        }
+        return ret;
+    }
+
+    var createIndexFn = function(dir) {
+        return function (list, value, isSorted, fromIndex) {
+            if (!_.isBoolean(isSorted)) {
+                if(dir === 1) 
+                    fromIndex = isSorted || 0;
+                else 
+                    fromIndex = isSorted || Math.max(list.length - 1, 0);
+                isSorted = false;
+            }
+            if(_.isBoolean(isSorted)) {
+                if (dir === 1)
+                    fromIndex = fromIndex || 0;
+                else
+                    fromIndex = fromIndex || Math.max(list.length - 1, 0);
+            }
+            
+            var half;
+            // to check
+            if(isSorted && dir !== -1) {
+                half = Math.floor(list.length / 2);
+                for(var i = half; i < list.length; i = half) {
+                    if(value < list[i]) {
+                        half = Math.floor(half - half / 2);
+                    } else {
+                        half = Math.floor(half + half / 2);
+                    }
+                    if(value === list[i])
+                    return i;
+                }
+            } else {
+                for (var i = fromIndex; i >= 0 && i < list.length; i += dir) {
+                    if (value === list[i])
+                    return i;
+                }
+            }
+            return -1;
+        }
+    }
+
+    _.indexOf = createIndexFn(1);
+
+    _.lastIndexOf = createIndexFn(-1);
+
+    _.sortedIndex = function(list, value, iteratee, context) {
+        iteratee = cb(iteratee, context);
+        var currentVal = iteratee(value);
+
+        var i = 0, length = list.length;
+        while(i < length) {
+            var mid = Math.floor((i + length) / 2);
+            // fix bug: not mid, is list[mid]
+            if(iteratee(list[mid]) < currentVal) i = mid + 1;
+            else length = mid;
+        }
+
+        return i;
+    }
+
+    var createFindIndexFn = function(dir) {
+        return function(list, predicate, context) {
+            predicate = cb(predicate, context);
+            for(var i = dir === -1 ? Math.max(list.length - 1, 0) : 0; i < list.length && i >= 0; i += dir) {
+
+                if(predicate(list[i], i, list)) break;
+            }
+            return i === list.length ? -1 : i;
+        }
+    }
+
+    _.findIndex = createFindIndexFn(1);
+
+    _.findLastIndex = createFindIndexFn(-1);
+
+    _.range = function(start, stop, step) {
+        if(!_.isNumber(stop)) {
+            stop = start || 0;
+            start = 0;
+        }
+        step = step || 1;
+        // var tmp;
+        var ret = [];
+        for (var i = start; start > stop ? i > stop : i < stop; i += step) {
+            ret.push(i);
+        }
+        return ret;
+    }
+
+
+    // how to new instance ?
+    _.bind = restArguments(function (fn, obj, args) {
+        if(!_.isArray(args)) {
+            // fix bug: [undefined]
+            // args = [args];
+            args = [];
+            obj = obj && obj[0];
+        }
+        return restArguments(function (innerArgs) {
+
+            return fn.apply(obj, args.concat(innerArgs));
+        })
+    })
+
+    _.bindAll = restArguments(function(obj, methodNames) {
+        _.each(methodNames, function(method) {
+            if (typeof obj[method] === 'function') {
+                obj[method] = _.bind(obj[method], obj)
+            }
+        })
+    })
+
+    // why to place a placeholder ? eg: _
+    _.partial = restArguments(function (fn, args) {
+        if(!_.isArray(args)) {
+            args = [];
+            fn = fn && fn[0];
+        }
+        return restArguments(function(innerArgs) {
+            return fn.apply(null, args.concat(innerArgs));
+        })
+    })
+
+    _.memoize = function(fn, hashFn) {
+        // to use lru will avoid stockoverflow
+        var cache = {};
+        hashFn = cb(hashFn);
+        return restArguments(function (args) {
+
+            var key = hashFn(args.join(''))
+            if(has(cache, key)) return cache[key];
+
+            return cache[key] = fn.apply(null, args);
+        })
+    }
+
+    _.delay = restArguments(function (fn, wait, args) {
+        if (_.isUndefined(args)) {
+            args = [];
+            wait = wait && wait[0];
+            wait = wait || 0;
+        }
+
+        setTimeout(function () {
+            fn.apply(null, args);
+        }, wait);
+    })
+
+    _.defer = restArguments(function(fn, args) {
+        if (_.isUndefined(args)) {
+            args = [];
+            fn = fn && fn[0];
+        }
+
+        setTimeout(function() {
+            fn.apply(null, args);
+        }, 1)
+    })
+
     // double closure will cause args undefined
     var createAssigner = function(keysFn, isOverride) {
         return restArguments(function (obj, args) {
@@ -332,7 +609,11 @@
             // var args = arguments.slice(1);
             // to create a variable to save ?
             // var args = slice.call(arguments, 1);
-            if (typeof args == 'undefined' || args.length === 0 || obj === void 0) return obj;
+
+            // to fix bug:args is not an array
+            // if(!_.isArray(args)) args = [args];
+            // log(args)
+            if (typeof args === 'undefined' || args.length === 0 || obj === void 0) return obj;
             _.each(args, function (source, i, sources) {
                 var keys = keysFn(source);
                 for (var i = 0, key; i < keys.length, key = keys[i]; i++) {
@@ -365,7 +646,7 @@
     
 
 
-    _.functions = function(obj) {
+    _.functions = _.methods = function(obj) {
         var arr = [];
         for (var prop in obj) {
             if (hasOwnProperty.call(obj, prop) && _.isFunction(obj[prop])) {
@@ -408,7 +689,7 @@
         return typeof obj === 'object' && obj !== null;
     }, true)
 
-    _.isDeepEqual = function (obj, other) {
+    _.isDeepEqual = _.isEqual = function (obj, other) {
         // how to easy to check isEqual?
         // only property ?or prototype ?
         // to check prototype chain 
@@ -462,6 +743,8 @@
     var has = function(obj, prop) {
         return hasOwnProperty.call(obj, prop);
     };
+
+    _.has = has;
 
     _.isEmpty = _.wrapperByArgsNumber(function (obj) {
         if(_.isArrayLike(obj)) {
@@ -552,7 +835,7 @@
 
     _.extend = createAssigner(_.allKeys, true);
     
-    _.extendOwn = createAssigner(_.keys, true);
+    _.extendOwn = _.assign = createAssigner(_.keys, true);
 
     // how to make a pretty function to create pick and omit? 
     // var createPickOmitFn = function(isPickFn) {
@@ -776,7 +1059,7 @@
         return ret == undefined ? [] : ret;
     }
 
-    _.contains = function (list, value, fromIndex) {
+    _.contains = _.includes = _.include = function (list, value, fromIndex) {
         var values, index;
         if(_.isArray(list)) {
             fromIndex = fromIndex > 0 ? Math.min(fromIndex, list.length - 1) : 0;
@@ -790,6 +1073,52 @@
         }
         return false;
     }
+
+    _.without = restArguments(function (list, values) {
+        if (values == undefined) values = [values];
+        return _.filter(list, function (val) {
+            return !_.contains(values, val);
+        })
+    })
+
+    // how to faster resolve ?
+    // to avoid use contains or indexOf,just to distinguish previous variable and now variable;
+    _.uniq = _.unique = function (list, isSorted, iteratee, context) {
+        if (_.isArrayLike(list)) return;
+        if (_.isBoolean(isSorted)) {
+            context = iteratee;
+            iteratee = isSorted;
+            isSorted = false;
+        }
+
+        if (iteratee) iteratee = cb(iteratee, context);
+
+        var seen = [];
+        var ret = [];
+
+        for (var i = 0; i < list.length; i++) {
+            var val = list[i];
+            var computed = iteratee ? iteratee(val, i, list) : val;
+            if (isSorted || !iteratee) {
+                if (!i || seen !== computed) {
+                    ret.push(val);
+                    // seen = computed;
+                }
+                // every loop will use
+                seen = computed;
+            } else if (iteratee) {
+                if (!_.contains(seen, computed)) {
+                    ret.push(val);
+                    seen.push(computed);
+                }
+            } else if (!_.contains(ret, val)) {
+                ret.push(val);
+            }
+        }
+
+        return ret;
+    }
+
 
     _.invoke = restArguments(function(list, methodName, args) {
         var result = _.isArray(list) ? [] : {};
@@ -984,9 +1313,50 @@
         return _.partition(list, !_.negate(Boolean))[0];
     }
 
-    _.first = function(list, n) {
-        
+    _.first = _.head = _.take = function(list, n) {
+        if(!_.isArrayLike(list)) return;
+        var length = Math.max(list.length, 0);
+        if (typeof n !== 'number') n = 1;
+        n = n || 1;
+        if(n === 1) {
+            return list[0];
+        } else {
+            return list.slice(0, Math.min(n, length));
+        }
     }
+
+    _.initial = function(list, n) {
+        if (!_.isArrayLike(list)) return;
+        var length = Math.max(list.length - 1, 0);
+        if (typeof n !== 'number') n = length;
+        if (!n) n = n || length;
+        else n = Math.max(list.length - n, 0);
+
+        return list.slice(0, Math.min(n, Math.max(list.length, 0)));
+    }
+
+    _.last = function(list, n) {
+        if (!_.isArrayLike(list)) return;
+        var length = Math.max(list.length - 1, 0);        
+        if (typeof n !== 'number') n = 1;
+
+        n = n || 1;
+        if (n === 1) {
+            return list[length];
+        } else {
+            return list.slice(Math.max(list.length - n, 0), Math.max(list.length, 0));
+        }
+    }
+
+    _.rest = _.drop = _.tail = function(list, n) {
+        if (!_.isArrayLike(list)) return;
+        var length = Math.max(list.length - 1, 0);
+        if (typeof n !== 'number') n = 1;
+
+        n = n || 1;
+        return list.slice(Math.max(n, 0), Math.max(list.length, 0));
+    }
+
     _.debounce = function(fn, delay, immediate) {
         var timer = null;
         var immediate = immediate || false;
@@ -1180,7 +1550,7 @@
         })
     });
 
-    _.noConfict = function () {
+    _.noConflict = function () {
         // this cooperation will not cover a variable _ ?
         root._ = defaultLikeUnderscoreUtil
         return this;
@@ -1384,3 +1754,9 @@
     _.mixin(_);
 
 })()
+
+// to do: pop, push, reverse, shift, sort, splice, unshift(will change params)
+// to add ArrayProto method to the wrapped obj;
+
+// to do: concat, join, slice
+// to add ArrayProto method to the wrapped obj;
