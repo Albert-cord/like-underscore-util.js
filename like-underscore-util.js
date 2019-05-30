@@ -1651,7 +1651,7 @@
         return '\\' + escapes[match];
     }
 
-    _.template = function (text, settings, oldSettings) {
+    _.template = function (text, settings, oldSettings) {   
         if(!settings && oldSettings) settings = oldSettings;
 
         settings = _.defaults({}, settings, _.templateSettings);
@@ -1726,6 +1726,26 @@
     }
 
 
+    _.each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(methodName, i, list) {
+        _.prototype[methodName] = function() {
+            ArrayProto[methodName].apply(this._wrapped, arguments)
+            // why this._wrapped.length === 0, need to delete this._wrapped[0]
+            if ((methodName === 'shift' || methodName === 'shift') && this._wrapped.length === 0)
+            delete this._wrapped[0];
+            return chainsFunc(this, this._wrapped);
+        }
+    });
+
+    _.each(['concat', 'join', 'slice'], function (methodName, i, list) {
+        _.prototype[methodName] = function () {
+            // is whether to add chain
+            // is itself a chain fun ?
+            // so convert to chainFn, if it is then convert chainFn, or convert a unChainFn
+            return chainsFunc(this, ArrayProto[methodName].apply(this._wrapped, arguments))
+        }
+    });
+
+
     _.onceLog = function (...args) {
         if (logOnce) return;
         console.log('onceLog: ', ...args);
@@ -1751,12 +1771,305 @@
         });
     };
 
+    // to do: countLogFn
+    _.countLog = function() {
+        var logCount = 0;
+        return restArguments(function (args) {
+            
+        })
+    }
+
+    var isPropAndIsObject = function (obj, prop) {
+        if (!Object.prototype.hasOwnProperty.call(obj, prop)) return false;
+        return (typeof obj[prop] === 'object' && Object.prototype.toString.call(obj[prop]) === '[object Object]') || false;
+    };
+
+    var __isProxy = Symbol();
+
+    _.proxy = function (proxyTarget, carePropertyRegExpArr, fn, context, args) {
+        var _proxySet = new WeakSet();
+
+        fn = cb(fn, context);
+        if(!_.isArray(args)) {
+            if(!_.isUndefined(args)) {
+                args = [args];
+            } else {
+                args = [];
+            }
+        }
+        if (!_.isArray(carePropertyRegExpArr)) {
+            carePropertyRegExpArr = _.isString(carePropertyRegExpArr) ? _.map(carePropertyRegExpArr.split(' '), function(str) {
+                return new RegExp(str);
+            }) : [''];
+        }
+        if (!Object.prototype.hasOwnProperty.call(proxyTarget, __isProxy)) {
+            proxyTarget[__isProxy] = true;
+        }
+
+        for (var prop in proxyTarget) {
+            //  && recursionTimes++ < maxRecursionTimes
+            if (isPropAndIsObject(proxyTarget, prop)) {
+                if (Object.prototype.hasOwnProperty.call(proxyTarget[prop], __isProxy) && proxyTarget[prop][__isProxy]) continue;
+                // Reflect.set(proxyTarget, prop, _.proxy(proxyTarget[prop]).proxy);
+                proxyTarget[prop] = _.proxy(proxyTarget[prop]).proxy;
+            }
+        }
+
+        var __proxy = Proxy.revocable(proxyTarget, {
+
+            get(target, property, receiver) {
+                if (_.some(carePropertyRegExpArr, function(regExp) {
+                    if (!_.isRegExp(regExp) && _.isString(regExp)) {
+                        regExp = new RegExp(regExp);
+                    }
+                    if(_.isRegExp(regExp)) {
+                        return regExp.test(property.toString());
+                    }
+                })) {
+                    args.unshift(target, property, value, receiver);
+                    fn.apply(context, args);
+                }
+                // need?
+                //  else if (isOpenPlayConsole) {
+                //     elseLog({ target: target, property: property, receiver: receiver, mode: 'get' })
+                // }
+                return Reflect.get(target, property);
+                // return target[property];
+            },
+
+            set(target, property, value, receiver) {
+                if (_.some(carePropertyRegExpArr, function (regExp) {
+                    if (!_.isRegExp(regExp) && _.isString(regExp)) {
+                        regExp = new RegExp(regExp);
+                    }
+                    if (_.isRegExp(regExp)) {
+                        return regExp.test(property.toString());
+                    }
+                })) {
+                    args.unshift(target, property, value, receiver);
+                    fn.apply(context, args);
+                }
+                Reflect.set(target, property, value, receiver);
+                // target[property] = value;
+            }
+
+        });
+
+        _proxySet.add(__proxy.revoke.bind(__proxy));
+
+        return {
+            proxy: __proxy.proxy,
+            revoke() {
+                _proxySet.forEach(fn => fn());
+            }
+        }
+    }
+
+
+    var buildTree = _.buildTree = function (list, fn, context, model) {
+        let temp = {};
+        let tree = {};
+        if(!_.isObject(list) && !_.isArray(list)) return;
+        fn = cb(fn,context);
+        for (let j in list) {
+            if (has(list, j))
+                temp[list[j].name] = list[j];
+        }
+        for (let i in temp) {
+            if (!has(temp, i)) continue;
+
+            if (temp[i].parent && temp[i].parent.length > 0) {
+                _.each(temp[i].parent, function (p) {
+                    if (temp[p] && !temp[p].children) {
+                        temp[p].children = {};
+                    }
+                    // if (!temp[p]) console.log('p, temp[p]', p, temp[p]);
+                    //一个类的父亲不能是自己
+                    //一个类的子类不能是这个类的父类
+                    if (temp[p] && !temp[p].parent) {
+                        temp[p] && p !== temp[i].name
+                            && (temp[p].children[temp[i].name] = fn(temp[i]));
+
+                    } else {
+                        temp[p] && p !== temp[i].name
+                            && (temp[p].parent && temp[p].parent.indexOf(temp[i].name) == -1)
+                            && (temp[p].children[temp[i].name] = fn(temp[i]));
+                    }
+                })
+            } else {
+                tree[temp[i].name] = temp[i];
+            }
+        }
+        if (_.isObject(model)) {
+            if (!(has(model, utilFunctions) && _.isArray(model.utilFunctions))) {
+                model.utilFunctions = [];
+            }
+            if (!(has(model, relationClasses) && _.isArray(model.relationClasses))) {
+                model.relationClasses = [];
+            }
+            for (let k in tree) {
+                if (!Object.prototype.hasOwnProperty.call(tree, k)) continue;
+
+                if (tree[k].children == undefined || tree[k].children.length == 0) {
+                    model.utilFunctions.push(tree[k]);
+                } else {
+                    model.relationClasses.push(tree[k]);
+                }
+            }
+        }
+        return tree;
+    }
+    var originalPropArr = []
+
+    var FunctionPrototypeCall = Function.prototype.call.bind();
+    var FunctionPrototypeApply = Function.prototype.apply.bind();
+
+    _.beforeDetectFnsRelation = function(isDetectFnsRelation) {
+
+        if(isDetectFnsRelation) {
+            Function.prototype.call = function (context) {
+                var context = context || window;
+                context.__fn = this;
+                if (context != window) {
+                    this.__children = this.__children || [];
+                    `${context.__proto__.constructor.name}` !== ''
+                        && this.__children.indexOf(`${context.__proto__.constructor.name}`) == -1
+                        && `${context.__proto__.constructor.name}` != this.name
+                        && this.__children.push(`${context.__proto__.constructor.name}`);
+
+                    context.__proto__.constructor.__parents = context.__proto__.constructor.__parents || [];
+                    `${this.name}` !== '' && context.__proto__.constructor.__parents.indexOf(`${this.name}`) == -1
+                        && context.__proto__.constructor.name != `${this.name}`
+                        && context.__proto__.constructor.__parents.push(`${this.name}`);
+                    // console.log(context.__proto__.constructor.__parents.length > 1 ? context.__proto__.constructor.__parents : "");
+                }
+                var args = [];
+                for (var i = 0, len = arguments.length; i < len; i++) {
+                    args.push('arguments[' + i + ']');
+                }
+
+                var result = eval('context.__fn(' + args + ')');
+                delete context.__fn
+                return result;
+            }
+
+            Function.prototype.apply = function (context, arr) {
+                var context = context || window;
+                context.__fn = this;
+
+                if (context != window) {
+                    this.__children = this.__children || [];
+                    `${context.__proto__.constructor.name}` !== ''
+                        && this.__children.indexOf(`${context.__proto__.constructor.name}`) == -1
+                        && `${context.__proto__.constructor.name}` != this.name
+                        && this.__children.push(`${context.__proto__.constructor.name}`);
+
+                    context.__proto__.constructor.__parents = context.__proto__.constructor.__parents || [];
+                    `${this.name}` !== '' && context.__proto__.constructor.__parents.indexOf(`${this.name}`) != -1
+                        && context.__proto__.constructor.name != `${this.name}`
+                        && context.__proto__.constructor.__parents.push(`${this.name}`);
+                    // console.log(context.__proto__.constructor.__parents.length > 1 ? context.__proto__.constructor.__parents : "");
+                }
+                var result;
+                if (!arr) {
+                    result = context.__fn();
+                }
+                else {
+                    var args = [];
+                    for (var i = 0, len = arr.length; i < len; i++) {
+                        args.push('arr[' + i + ']');
+                    }
+
+                    result = eval('context.__fn(' + args + ')')
+                }
+                return result;
+            }
+        }
+
+        for (var _prop in window) {
+            if (has(window, _prop) && originalPropArr.indexOf(_prop) === -1) originalPropArr.push(`${_prop}`);
+        }
+    }
+
+    _.detectEnv = function(isNotLongDetectFnsRelation) {
+        var model = {
+            classes: [],
+            utilFunctions: [],
+            relationClasses: [],
+            props: {
+                vals: [],
+                objs: [],
+                strs: [],
+                nums: [],
+                arrs: [],
+                bools: [],
+                nullAndUndefineds: []
+            }
+        };
+        var _typesForModel;
+        originalPropArr.push('_typesForModel', 'model');
+
+        for (var _prop in window) {
+            if (Object.prototype.hasOwnProperty.call(window, _prop)
+                && originalPropArr.indexOf(`${_prop}`) === -1) {
+                if (window[_prop] === null || window[_prop] === undefined) {
+                    model['props']['nullAndUndefineds'].push(`${_prop}`);
+                    continue;
+                }
+                _typesForModel = typeof window[_prop];
+                // console.log(_typesForModel)
+                switch (_typesForModel) {
+                    case 'function': {
+                        model['classes'].push(`${_prop}`);
+                        break;
+                    }
+                    case 'boolean': {
+                        model['props']['bools'].push(`${_prop}`);
+                        break;
+                    }
+                    case 'string': {
+                        model['props']['strs'].push(`${_prop}`);
+                        break;
+                    }
+                    case 'number': {
+                        model['props']['nums'].push(`${_prop}`);
+                        break;
+                    }
+                    case 'object': {
+                        if (Array.isArray(window[_prop])) {
+                            model['props']['arrs'].push(`${_prop}`);
+                        } else {
+                            model['props']['objs'].push(`${_prop}`);
+                        }
+                        break;
+                    }
+                    default: {
+                        model['props']['vals'].push(`${_prop}`);
+                        break;
+                    }
+                }
+            }
+        }
+
+        model.retClasses = model.classes.map(name => {
+            return {
+                name: name,
+                parent: window[name].__parents,
+                // childs: window[name].__children
+            }
+        });
+
+        model.rets = buildTree(model.retClasses);
+        if (isNotLongDetectFnsRelation) {
+            Function.prototype.call = FunctionPrototypeCall;
+            Function.prototype.apply = FunctionPrototypeApply;
+        }
+        return model;
+    }
+
     _.mixin(_);
 
 })()
 
-// to do: pop, push, reverse, shift, sort, splice, unshift(will change params)
-// to add ArrayProto method to the wrapped obj;
-
-// to do: concat, join, slice
-// to add ArrayProto method to the wrapped obj;
+// to do:test module;
+// to do:add to npm packages
