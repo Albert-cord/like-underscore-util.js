@@ -1866,9 +1866,11 @@
     }
 
 
-    var buildTree = _.buildTree = function (list, fn, context, model) {
+    var buildTree = _.buildTree = function (list, fn, context, {children, parent, model}) {
         let temp = {};
         let tree = {};
+        children = children || 'children';
+        parent = parent || 'parent';
         if(!_.isObject(list) && !_.isArray(list)) return;
         fn = cb(fn,context);
         for (let j in list) {
@@ -1878,22 +1880,22 @@
         for (let i in temp) {
             if (!has(temp, i)) continue;
 
-            if (temp[i].parent && temp[i].parent.length > 0) {
-                _.each(temp[i].parent, function (p) {
-                    if (temp[p] && !temp[p].children) {
-                        temp[p].children = {};
+            if (temp[i][parent] && temp[i][parent].length > 0) {
+                _.each(temp[i][parent], function (p) {
+                    if (temp[p] && !temp[p][children]) {
+                        temp[p][children] = {};
                     }
                     // if (!temp[p]) console.log('p, temp[p]', p, temp[p]);
                     //一个类的父亲不能是自己
                     //一个类的子类不能是这个类的父类
-                    if (temp[p] && !temp[p].parent) {
+                    if (temp[p] && !temp[p][parent]) {
                         temp[p] && p !== temp[i].name
-                            && (temp[p].children[temp[i].name] = fn(temp[i]));
+                            && (temp[p][children][temp[i].name] = fn(temp[i]));
 
                     } else {
                         temp[p] && p !== temp[i].name
-                            && (temp[p].parent && temp[p].parent.indexOf(temp[i].name) == -1)
-                            && (temp[p].children[temp[i].name] = fn(temp[i]));
+                            && (temp[p][parent] && temp[p][parent].indexOf(temp[i].name) == -1)
+                            && (temp[p][children][temp[i].name] = fn(temp[i]));
                     }
                 })
             } else {
@@ -1908,9 +1910,9 @@
                 model.relationClasses = [];
             }
             for (let k in tree) {
-                if (!Object.prototype.hasOwnProperty.call(tree, k)) continue;
+                if (!has(tree, k)) continue;
 
-                if (tree[k].children == undefined || tree[k].children.length == 0) {
+                if (tree[k][children] == undefined || (tree[k][children] && tree[k][children].length == 0)) {
                     model.utilFunctions.push(tree[k]);
                 } else {
                     model.relationClasses.push(tree[k]);
@@ -1924,7 +1926,7 @@
     var FunctionPrototypeCall = Function.prototype.call.bind();
     var FunctionPrototypeApply = Function.prototype.apply.bind();
 
-    _.beforeDetectFnsRelation = function(isDetectFnsRelation) {
+    _.beforeDetectEnv = function(isDetectFnsRelation) {
 
         if(isDetectFnsRelation) {
             Function.prototype.call = function (context) {
