@@ -1445,6 +1445,52 @@
         };
     };
 
+    _.timeChunk = function(arr, fn, count, context, wait) {
+        if(!_.isArray(arr) && !_.isObject(arr)) return;
+        count = Math.max(1, count || 8);
+        wait = wait || 200;
+        fn = cb(fn, context);
+        var i = 0, start, length = _.isArray(arr) ? arr.length : _.keys(arr).length;
+        arr = _.clone(arr);
+        list = _.isArray(arr) ?  arr : _.keys(arr);        
+        var chunk = Math.max(1, count);
+        var timer;
+        var start, loop;
+
+        if(_.isArray(arr)) {
+            start = function() {
+                for(; i < chunk && i < length; i++) {
+                    fn(list[i], i, list);
+                }
+                i = chunk;
+                chunk = Math.min(length, chunk + count);
+            }
+        } else {
+            start = function() {
+                for(; i < chunk && i < length; i++) {
+                    fn(arr[list[i]], list[i], arr);
+                }
+                i = chunk;
+                chunk = Math.min(length, chunk + count);            
+            }                
+        }
+
+        loop = function() {
+            log(i, chunk, length)
+            start();
+            timer = setTimeout(function() {
+                loop();
+                if(length === i) {
+
+                    clearTimeout(timer);
+                    timer = null;
+                }
+            });
+        }
+
+        return loop;
+    };
+
     _.once = function(fn) {
         return function() {
             var context = this;
