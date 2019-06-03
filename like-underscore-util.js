@@ -58,20 +58,20 @@
         if(ctx == null) return func;
         // no argCount is the same as with three arguments
         switch(argCount == null ? 3 : argCount) {
-            //only one param is a value;
-            case 1: return function(value) {
-                return func.call(ctx, value);
-            };
-            //three params is value, index, collection
-            //it is always used for map ...
-            case 3: return function(value, index, collection) {
-                return func.call(ctx, value, index, collection);
-            }
-            //four params is accumulator, value, index, collection
-            //it is always used for reduce ...
-            case 4: return function (accumulator, value, index, collection) {
-                return func.call(ctx, accumulator, value, index, collection);
-            }
+        //only one param is a value;
+        case 1: return function(value) {
+            return func.call(ctx, value);
+        };
+        //three params is value, index, collection
+        //it is always used for map ...
+        case 3: return function(value, index, collection) {
+            return func.call(ctx, value, index, collection);
+        }
+        //four params is accumulator, value, index, collection
+        //it is always used for reduce ...
+        case 4: return function (accumulator, value, index, collection) {
+            return func.call(ctx, accumulator, value, index, collection);
+        }
         }
         //default with arguments,there is not a good performance 
         return function() {
@@ -342,7 +342,7 @@
                 return _.isArray(now) ? now.concat(next) : [now].concat(next);
             } else {
                 return _.isArray(now) ? _.flatten(now).concat(_.isArray(next) ? _.flatten(next) : next)
-                        : [now].concat(_.isArray(next) ? _.flatten(next) : next);
+                    : [now].concat(_.isArray(next) ? _.flatten(next) : next);
             }
         })
     };
@@ -431,12 +431,13 @@
     }
 
     _.chunk = function(list, length) {
-        if(!length) return list;
+        if(!length) return [];
         if(!_.isArrayLike(list)) return;
         var ret = [];
         length = typeof length === 'number' ? Math.ceil(length) : 1;
         length = Math.min(length, list.length);
-        for(var i = 0; i < list.length; i += length) {
+        // debugger;
+        for(var i = 0; i < list.length && i > 0; i += length) {
             ret.push(list.slice(i, i + length))
         }
         return ret;
@@ -469,12 +470,12 @@
                         half = Math.floor(half + half / 2);
                     }
                     if(value === list[i])
-                    return i;
+                        return i;
                 }
             } else {
                 for (var i = fromIndex; i >= 0 && i < list.length; i += dir) {
                     if (value === list[i])
-                    return i;
+                        return i;
                 }
             }
             return -1;
@@ -523,7 +524,7 @@
         step = step || 1;
         // var tmp;
         var ret = [];
-        for (var i = start; start > stop ? i > stop : i < stop; i += step) {
+        for (var i = start; start > stop ? (i > stop && i < start) : (i < stop && i > start); i += step) {
             ret.push(i);
         }
         return ret;
@@ -663,9 +664,9 @@
     }
 
     _.each(['Arguments', 'Function', 'String', 
-    'Number', 'Date', 'Symbol', 
-    'RegExp', 'Error', 'Map', 
-    'WeakMap', 'Set', 'WeakSet'], function (params) {
+        'Number', 'Date', 'Symbol', 
+        'RegExp', 'Error', 'Map', 
+        'WeakMap', 'Set', 'WeakSet'], function (params) {
         _['is' + params] = _.wrapperByArgsNumber(_.isObjectTypeFn(params), true);
     })
 
@@ -770,9 +771,9 @@
         return _.isObjectLike(node) && node.nodeType === 1 && typeof node.nodeName === 'string'
     });
 
-//    _.isArguments = _.wrapperByArgsNumber(function (args) {
-//     return _.isArrayLike(args) && (typeof args.callee === 'function')
-//     }, true);
+    //    _.isArguments = _.wrapperByArgsNumber(function (args) {
+    //     return _.isArrayLike(args) && (typeof args.callee === 'function')
+    //     }, true);
 
     // _.isString = _.wrapperByArgsNumber(function (str) {
     //     return typeof str === 'string' || _.isObjectTypeFn('String')(str);
@@ -1314,10 +1315,15 @@
     }
 
     _.first = _.head = _.take = function(list, n) {
-        if(!_.isArrayLike(list)) return;
+        if(!_.isArrayLike(list)){
+            if(typeof n === 'number')
+                return [];
+            else return;
+        }
         var length = Math.max(list.length, 0);
-        if (typeof n !== 'number') n = 1;
-        n = n || 1;
+        if(length === 0) return [];
+        if (typeof n !== 'number') n = 0;
+        n = n || 0;
         if(n === 1) {
             return list[0];
         } else {
@@ -1485,7 +1491,7 @@
                     clearTimeout(timer);
                     timer = null;
                 }
-            });
+            }, wait);
         }
 
         return loop;
@@ -1587,7 +1593,7 @@
             var ret;
             var i = fns.length - 1
             
-            i >= 0 &&　(ret = fns[i].apply(this, args));
+            i >= 0 && (ret = fns[i].apply(this, args));
             for (var i = fns.length - 2; i >= 0; i--) {
 
                 ret = fns[i].call(this, ret);
@@ -1777,7 +1783,7 @@
             ArrayProto[methodName].apply(this._wrapped, arguments)
             // why this._wrapped.length === 0, need to delete this._wrapped[0]
             if ((methodName === 'shift' || methodName === 'shift') && this._wrapped.length === 0)
-            delete this._wrapped[0];
+                delete this._wrapped[0];
             return chainsFunc(this, this._wrapped);
         }
     });
@@ -1792,7 +1798,7 @@
     });
 
 
-    _.onceLog = function (...args) {
+    _.onceLog = function(...args) {
         if (logOnce) return;
         console.log('onceLog: ', ...args);
         logOnce = true;
@@ -1805,7 +1811,7 @@
         if (eqArrs && Array.isArray(eqArrs) && (eqArrs.length === 0 || eqArrs.length % 2 === 1)) {
             throw new Error('eqLog function arguments must be an array and first one length must be double');
         }
-        //how it not a original variable ?
+        // how it not a original variable ?
         for (var i = 0; i < eqArrs.length; i += 2) {
             if (eqArrs[i] !== eqArrs[i + 1]) {
                 return null;
@@ -1819,7 +1825,7 @@
 
     // to do: countLogFn
     _.countLog = function() {
-        var logCount = 0;
+        // var logCount = 0;
         return restArguments(function (args) {
             
         })
@@ -1972,8 +1978,9 @@
     var FunctionPrototypeCall = Function.prototype.call.bind();
     var FunctionPrototypeApply = Function.prototype.apply.bind();
 
-    _.beforeDetectEnv = function(isDetectFnsRelation) {
-
+    _.beforeDetectEnv = function(env, isDetectFnsRelation) {
+        env = env || root;
+        
         if(isDetectFnsRelation) {
             Function.prototype.call = function (context) {
                 var context = context || window;
@@ -1992,7 +1999,8 @@
                     // console.log(context.__proto__.constructor.__parents.length > 1 ? context.__proto__.constructor.__parents : "");
                 }
                 var args = [];
-                for (var i = 0, len = arguments.length; i < len; i++) {
+                // i is 1
+                for (var i = 1, len = arguments.length; i < len; i++) {
                     args.push('arguments[' + i + ']');
                 }
 
@@ -2034,12 +2042,13 @@
             }
         }
 
-        for (var _prop in window) {
-            if (has(window, _prop) && originalPropArr.indexOf(_prop) === -1) originalPropArr.push(`${_prop}`);
+        for (var _prop in env) {
+            if (has(env, _prop) && originalPropArr.indexOf(_prop) === -1) originalPropArr.push(`${_prop}`);
         }
     }
 
-    _.detectEnv = function(isNotLongDetectFnsRelation) {
+    _.detectEnv = function(env, isNotLongDetectFnsRelation) {
+        env = env || root;
         var model = {
             classes: [],
             utilFunctions: [],
@@ -2057,44 +2066,46 @@
         var _typesForModel;
         originalPropArr.push('_typesForModel', 'model');
 
-        for (var _prop in window) {
-            if (Object.prototype.hasOwnProperty.call(window, _prop)
+        for (var _prop in env) {
+            if (Object.prototype.hasOwnProperty.call(env, _prop)
                 && originalPropArr.indexOf(`${_prop}`) === -1) {
-                if (window[_prop] === null || window[_prop] === undefined) {
+                if (env[_prop] === null || env[_prop] === undefined) {
                     model['props']['nullAndUndefineds'].push(`${_prop}`);
                     continue;
                 }
-                _typesForModel = typeof window[_prop];
+                _typesForModel = typeof env[_prop];
                 // console.log(_typesForModel)
                 switch (_typesForModel) {
-                    case 'function': {
-                        model['classes'].push(`${_prop}`);
-                        break;
+
+                case 'function': {
+                    model['classes'].push(`${_prop}`);
+                    break;
+                }
+                case 'boolean': {
+                    model['props']['bools'].push(`${_prop}`);
+                    break;
+                }
+                case 'string': {
+                    model['props']['strs'].push(`${_prop}`);
+                    break;
+                }
+                case 'number': {
+                    model['props']['nums'].push(`${_prop}`);
+                    break;
+                }
+                case 'object': {
+                    if (Array.isArray(env[_prop])) {
+                        model['props']['arrs'].push(`${_prop}`);
+                    } else {
+                        model['props']['objs'].push(`${_prop}`);
                     }
-                    case 'boolean': {
-                        model['props']['bools'].push(`${_prop}`);
-                        break;
-                    }
-                    case 'string': {
-                        model['props']['strs'].push(`${_prop}`);
-                        break;
-                    }
-                    case 'number': {
-                        model['props']['nums'].push(`${_prop}`);
-                        break;
-                    }
-                    case 'object': {
-                        if (Array.isArray(window[_prop])) {
-                            model['props']['arrs'].push(`${_prop}`);
-                        } else {
-                            model['props']['objs'].push(`${_prop}`);
-                        }
-                        break;
-                    }
-                    default: {
-                        model['props']['vals'].push(`${_prop}`);
-                        break;
-                    }
+                    break;
+                }
+                default: {
+                    model['props']['vals'].push(`${_prop}`);
+                    break;
+                }
+
                 }
             }
         }
@@ -2102,7 +2113,7 @@
         model.retClasses = model.classes.map(name => {
             return {
                 name: name,
-                parent: window[name].__parents,
+                parent: env[name].__parents,
                 // childs: window[name].__children
             }
         });

@@ -4,7 +4,10 @@
   "description": "util-js-library.",
   "main": "like-underscore-util.js",
   "scripts": {
-    "test": "test"
+    "test": "npm run eslint && npm run test-qunit",
+    "eslint": "eslint like-underscore-util.js test/*.js",
+    "test-qunit": "qunit test/*.js",
+    "test-karma": "karma start ./karma.config.js"
   },
   "repository": {
     "type": "git",
@@ -21,9 +24,12 @@
   },
   "homepage": "https://github.com/Albert-cord/like-underscore-util.js#readme",
   "dependencies": {
-    "karma": "^4.1.0"
+    "karma": "^4.1.0",
+    "karma-phantomjs-launcher": "^1.0.4"
   },
   "devDependencies": {
-    "karma-qunit": "^3.1.2"
+    "karma-chrome-launcher": "^2.2.0",
+    "karma-qunit": "^3.1.2",
+    "qunit": "^2.9.2"
   }
 }
