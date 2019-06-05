@@ -131,7 +131,7 @@
     _.isArrayLike = _.wrapperByArgsNumber(function (obj) {
         if (typeof obj === 'object' && obj !== null) {
             var length = shallowProperty('length')(obj);
-            if (0 <= length && MAX_ARRAY_INDEX >= length) return true;
+            if (typeof length === 'number' && 0 <= length && MAX_ARRAY_INDEX >= length) return true;
         }
         return false;
     }, true)
@@ -234,33 +234,39 @@
 
     _.each = _.forEach = function(obj, func, ctx) {
         var iteratee = optimizeCb(func, ctx);
+        if(obj == null) return null;
         var isArray = _.isArrayLike(obj);
-        var i = 0;
+        var i = 0, length;
         // var length = isArray ? obj.length : keys.length;
         if(isArray) {
-            for(i = 0; i < obj.length; i++) {
+            length = obj.length
+            for(i = 0; i < length; i++) {
                 iteratee(obj[i], i, obj);
             }
         } else {
             var keys = _.keys(obj);
-            for(i = 0; i< keys.length; i++) {
+            length = keys.length
+            for(i = 0; i< length; i++) {
                 iteratee(obj[keys[i]], keys[i], obj);
             }
         }
+        return obj;
     }
 
     _.map = _.collect = function (list, iteratee, context) {
         iteratee = cb(iteratee, context);
         var isArray = _.isArrayLike(list);
-        var i;
+        var i, length;
         var result = [];
         if (isArray) {
-            for (i = 0; i < list.length; i++) {
+            length = list.length;
+            for (i = 0; i < length; i++) {
                 result.push(iteratee(list[i], i, list));
             }
         } else {
-            var keys = _.keys(obj);
-            for (i = 0; i < keys.length; i++) {
+            var keys = _.keys(list);
+            length = keys.length;
+            for (i = 0; i < length; i++) {
                 result.push(iteratee(list[keys[i]], keys[i], list));
             }
         }
@@ -272,17 +278,19 @@
     _.every = _.all = function(list, iteratee, context) {
         iteratee = cb(iteratee, context);
         var isArray = _.isArrayLike(list);
-        var i, keys;
+        var i, keys, length;
         if (isArray) {
-            for(i = 0; i < list.length; i++) {
-                if (!iteratee(i, list[i], list)) {
+            length = list.length;
+            for(i = 0; i < length; i++) {
+                if (!iteratee(list[i], i, list)) {
                     return false;
                 }
             }
         } else {
             keys = _.keys(list);
-            for (i = 0; i < keys.length; i++) {
-                if(!iteratee(keys[i], list[keys[i]], list)) {
+            length = keys.length;            
+            for (i = 0; i < length; i++) {
+                if(!iteratee(list[keys[i]], keys[i], list)) {
                     return false;
                 }
             }
@@ -293,17 +301,19 @@
     _.some = _.any = function (list, iteratee, context) {
         iteratee = cb(iteratee, context);
         var isArray = _.isArrayLike(list);
-        var i, keys;
+        var i, keys, length;
         if (isArray) {
-            for (i = 0; i < list.length; i++) {
-                if (iteratee(i, list[i], list)) {
+            length = list.length;
+            for (i = 0; i < length; i++) {
+                if (iteratee(list[i], i, list)) {
                     return true;
                 }
             }
         } else {
             keys = _.keys(list);
-            for (i = 0; i < keys.length; i++) {
-                if (iteratee(keys[i], list[keys[i]], list)) {
+            length = keys.length;
+            for (i = 0; i < length; i++) {
+                if (iteratee(list[keys[i]], keys[i], list)) {
                     return true;
                 }
             }
@@ -314,16 +324,17 @@
     var createReduceFn = function (step) {
         
         return function (list, iteratee, initVariable, context) {
-            if(!_.isArrayLike(list) || !list.length) return;            
-            // if(list.length <= 1) return list[0] || [];
+            if(!_.isArrayLike(list)) list = _.values(list);
+            if(!list.length) return;           
+            if(list.length === 1) return list[0];
             iteratee = cb(iteratee, context, 4);
             var i = step > 0 ? 0 : list.length - 1;
             if (initVariable == undefined) {
                 initVariable = list[i];
                 i += step;
             }
-
-            for (; i >= 0 && i < list.length; i += step) {
+            var length = list.length;
+            for (; i >= 0 && i < length; i += step) {
                 initVariable = iteratee(initVariable, list[i], i, list);
             }
             
@@ -501,10 +512,11 @@
         return function(list, predicate, context) {
             if(!_.isArrayLike(list)) return -1;
             predicate = cb(predicate, context);
-            for(var i = dir === -1 ? Math.max(list.length - 1, 0) : 0; i < list.length && i >= 0; i += dir) {
+            var length = list.length;
+            for(var i = dir === -1 ? Math.max(length - 1, 0) : 0; i < length && i >= 0; i += dir) {
                 if(predicate(list[i], i, list)) break;
             }
-            return i === list.length ? -1 : i;
+            return i === length ? -1 : i;
         }
     }
 
@@ -897,19 +909,18 @@
 
     _.pick = restArguments(function(obj, keys) {
         var keyArr = _.keys(obj), iteratee, result = Object.create(null);
-        if(typeof keys === 'function') {
-            iteratee = keys;
+        if(typeof (keys && keys[0])  === 'function') {
+            iteratee = cb(keys[0]);
             
             _.each(keyArr, function(key, i, keyArr) {
                 if(iteratee(obj[key], key, obj)) result[key] = obj[key];
             });
         } else {
+            log('keys', keys)
+            iteratee = cb();
             keys = typeof keys === 'string' ? Array(keys) : keys;
-
             _.each(keys, function(key, i, keys) {
-                if(keyArr.indexOf(key) !== -1) {
-                    result[key] = obj[key];
-                }
+                if(iteratee(obj[key], key, obj)) result[key] = obj[key];
             })
         }
         return result;
@@ -917,18 +928,17 @@
 
     _.omit = restArguments(function(obj, keys) {
         var keyArr = _.keys(obj), iteratee, result = Object.create(null);
-        if(typeof keys === 'function') {
-            iteratee = keys;
-            
+        if(typeof (keys && keys[0]) === 'function') {
+            iteratee = cb(keys[0]);
             _.each(keyArr, function(key, i, keyArr) {
                 if(!iteratee(obj[key], key, obj)) result[key] = obj[key];
             });
         } else {
+            log('keys', keys)
+            iteratee = cb();
             keys = typeof keys === 'string' ? Array(keys) : keys;
             _.each(keys, function(key, i, keys) {
-                if(keyArr.indexOf(key) == -1) {
-                    result[key] = obj[key];
-                }
+                if(iteratee(obj[key], key, obj)) result[key] = obj[key];
             })
         }
         return result;
@@ -1012,16 +1022,18 @@
 
     _.find = _.detect = function (list, predicate, context) {
         predicate = cb(predicate, context);
-        var i;
+        var i,length;
         if(_.isArray(list)) {
-            for (i = 0; i < list.length; i++) {
+            length = list.length;
+            for (i = 0; i < length; i++) {
                 if (predicate(list[i], i, list)) {
                     return list[i];
                 }
             }
         } else {
             var keys = _.keys(list);
-            for (i = 0; i < keys.length; i++) {
+            length = keys.length;
+            for (i = 0; i < length; i++) {
                 if (predicate(list[keys[i]], keys[i], list)) {
                     return list[keys[i]];                    
                 }
@@ -1032,10 +1044,11 @@
 
     _.filter = _.select = function (list, predicate, context) {
         predicate = cb(predicate, context);
-        var ret, i;
+        var ret, i, length;
         if (_.isArrayLike(list)) {
             ret = [];
-            for (i = 0; i < list.length; i++) {
+            length = list.length;
+            for (i = 0; i < length; i++) {
                 if (predicate(list[i], i, list)) {
                     ret.push(list[i]);
                 }
@@ -1043,7 +1056,8 @@
         } else {
             ret = {}
             var keys = _.keys(list);
-            for (i = 0; i < keys.length; i++) {
+            length = keys.length;
+            for (i = 0; i < length; i++) {
                 if (predicate(list[keys[i]], keys[i], list)) {
                     ret[keys[i]] = list[keys[i]];
                 }
@@ -1092,10 +1106,11 @@
 
     _.reject = function (list, predicate, context) {
         predicate = cb(predicate, context);
-        var ret, i;
+        var ret, i, length;
         if (_.isArray(list)) {
             ret = [];
-            for (i = 0; i < list.length; i++) {
+            length = list.length;
+            for (i = 0; i < length; i++) {
                 if (!predicate(list[i], i, list)) {
                     ret.push(list[i]);
                 }
@@ -1103,7 +1118,8 @@
         } else {
             ret = {}
             var keys = _.keys(list);
-            for (i = 0; i < keys.length; i++) {
+            length = keys.length;
+            for (i = 0; i < length; i++) {
                 if (!predicate(list[keys[i]], keys[i], list)) {
                     ret[keys[i]] = list[keys[i]];
                 }
@@ -1198,16 +1214,14 @@
     _.max = function(list, iteratee, context) {
         var maxVal = -Infinity, max, current;
         if(_.isEmpty(list)) return maxVal;
-        if(_.isArray(list)) {
-            iteratee = cb(iteratee, context);
-            _.each(list, function(val, index, list) {
-                current = iteratee(val);
-                if(current > maxVal) {
-                    maxVal = current;
-                    max = val;
-                }
-            })
-        }
+        iteratee = cb(iteratee, context);
+        _.each(list, function(val, index, list) {
+            current = iteratee(val, index, list);
+            if(current > maxVal) {
+                maxVal = current;
+                max = val;
+            }
+        })
         return max || maxVal;
     }
 
@@ -1215,16 +1229,14 @@
 
         var minVal = Infinity, min, current;
         if(_.isEmpty(list)) return minVal;
-        if(_.isArray(list)) {
-            iteratee = cb(iteratee, context);
-            _.each(list, function(val, index, list) {
-                current = iteratee(val);
-                if(current < minVal) {
-                    minVal = current;
-                    min = val;
-                }
-            })
-        }
+        iteratee = cb(iteratee, context);
+        _.each(list, function(val, index, list) {
+            current = iteratee(val, index, list);
+            if(current < minVal) {
+                minVal = current;
+                min = val;
+            }
+        })
         return min || minVal;
     }
 
@@ -1286,12 +1298,13 @@
 
     _.sample = function(list, n, isOnlyOne) {
         if(n == null || isOnlyOne) {
-            if(!_.isArrayLike(list)) list = _.values(list);
+            if(!_.isArrayLike(list) || _.isObject(list)) list = _.values(list);
             return list[_.random(list.length)];
         }
-        if(!_.isArrayLike(list)) list = _.values(list);
+        if(!_.isArrayLike(list) || _.isObject(list)) list = _.values(list);
         else list = _.clone(list);
-        var j, temp, length = list.length;
+        var j, temp, length = _.isArray(list) ? list.length : _.values(list).length;
+        if(length <= 1) return list;
         n = Math.max(Math.min(n, length), 0);
         for(var i = 0; i < length; i++) {
             // j = _.random(0, length - i);
@@ -1300,8 +1313,7 @@
             list[i] = list[j];
             list[j] = temp;
         }
-
-        return list.slice(0, n);
+        return slice.call(list, 0, n);
     }
 
     _.shuffle = function(list) {
@@ -1313,8 +1325,8 @@
         var keys = _.keys(obj);
         if(keys.length === 0) return;
         for(var i = 0; i < keys.length; i++) {
-            if(predicate(obj[key[i]], key[i], obj)) {
-                return key[i];
+            if(predicate(obj[keys[i]], keys[i], obj)) {
+                return keys[i];
             }
         }
     }
