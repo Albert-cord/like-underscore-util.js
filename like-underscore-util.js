@@ -45,7 +45,7 @@
         //if _.iteratee is user defined;
         if (_.iteratee != builtinIteratee) return _.iteratee(value, context);
         //if there is not a function, use themself;
-        if(!value) return _.identity;
+        if(value == null) return _.identity;
         if(_.isFunction(value)) return optimizeCb(value, context, argCount);
         // If value is the original object, how it work ?
         // turn to use Object to map attributes
@@ -85,6 +85,7 @@
             return obj && obj[prop];
         }
     }
+    var getLength = shallowProperty('length');
 
     var restArguments = function(fn) {
         var length = fn && fn.length || 0;
@@ -133,7 +134,7 @@
             if (0 <= length && MAX_ARRAY_INDEX >= length) return true;
         }
         return false;
-    })
+    }, true)
 
     _.identity = function(value) {
         return value;
@@ -203,7 +204,7 @@
                 var args = [this._wrapped];
                 // this will cause Maximum call stack size exceeded
                 // this._chain = true;
-                push.call(args, arguments);
+                push.apply(args, arguments);
                 return chainsFunc(this, func.apply(_, args)); /* 这里有必要用_的上下文吗？ */
             }
         })
@@ -260,7 +261,7 @@
         } else {
             var keys = _.keys(obj);
             for (i = 0; i < keys.length; i++) {
-                result.push(iteratee(list[keys[i]], i, list));
+                result.push(iteratee(list[keys[i]], keys[i], list));
             }
         }
         
@@ -313,6 +314,8 @@
     var createReduceFn = function (step) {
         
         return function (list, iteratee, initVariable, context) {
+            if(!_.isArrayLike(list) || !list.length) return;            
+            // if(list.length <= 1) return list[0] || [];
             iteratee = cb(iteratee, context, 4);
             var i = step > 0 ? 0 : list.length - 1;
             if (initVariable == undefined) {
@@ -332,25 +335,61 @@
 
     _.reduceRight = _.foldr = createReduceFn(-1);
 
+    // very low-speed program
+    // var getLength = shallowProperty('length');
+    // _.flatten = function (arr, isShallow) {
+    //     var ret;
+    //     if(!_.isArrayLike(arr)) return [];
+    //     if(getLength(arr) === 0) return [];
+    //     if(getLength(arr) === 1) return _.isArray(arr[0]) ? _.flatten(arr[0]) : arr;
+    // is not need to reduce(one, two, one, two, just get a for's cursive)
+    //     ret = _.reduce(arr, function(now, next) {
+    //         // log(now, next)
+    //         if(isShallow) {
+    //             return _.isArray(now) ? now.concat(next) : [now].concat(next);;
+    //         } else {
+    //             return _.isArray(now) ? _.flatten(now).concat(_.isArray(next) ? _.flatten(next) : next)
+    //                 : [now].concat(_.isArray(next) ? _.flatten(next) : next);
+    //         }
+    //     });
+    //     return ret;
+    // };
 
-    _.flatten = function (arr, isShallow) {
+    var flatten = function(input, isShallow, isStrict, output) {
+        output = output || [];
+        if(!_.isArrayLike(input) || input.length === 0) return [];
+        var value, idx = output.length;
 
-        if(!_.isArrayLike(arr)) return;
+        for(var i = 0, length = input.length; i < length; i++) {
+            value = input[i];
+            if(_.isArrayLike(value)) {
 
-        return _.reduce(arr, function(now, next) {
-            if(isShallow) {
-                return _.isArray(now) ? now.concat(next) : [now].concat(next);
-            } else {
-                return _.isArray(now) ? _.flatten(now).concat(_.isArray(next) ? _.flatten(next) : next)
-                    : [now].concat(_.isArray(next) ? _.flatten(next) : next);
+                if(isShallow) {
+                    var j = 0, valLength = value.length;
+                    while(j < valLength) output[idx++] = value[j++];
+                } else {
+                    flatten(value, isShallow, isStrict, output);
+                    idx = output.length;
+                }
+
+            } else if(!isStrict) {
+                output[idx++] = value;
             }
-        })
-    };
+        }
+
+        return output;
+    }
+
+    _.flatten = function(input, isShallow) {
+        return flatten(input, isShallow);
+    }
 
     _.union = restArguments(function (lists) {
         var ret = [];
         if (!_.isArrayLike(lists)) return;
-
+        lists = _.filter(lists, function(list) {
+            return _.isArrayLike(list);
+        })
         lists = _.flatten(lists, true);
         _.each(lists, function (val) {
             if (ret.indexOf(val) === -1) ret.push(val);
@@ -360,13 +399,24 @@
 
     _.intersection = restArguments(function (lists) {
         if (!_.isArrayLike(lists)) return;
+        if(_.contains(lists, null)) return [];
         return _.reduce(lists, function (now, next) {
             if (!_.isArrayLike(now)) return _.isArrayLike(next) ? next : [];
             if (!_.isArrayLike(next)) return _.isArrayLike(now) ? now : [];
-            return _.filter(now, function (val) {
-                return next.indexOf(val) !== -1;
-            })
-        })
+            if(now.length === 0) {
+                _.each(next, function(val) {
+                    if(!_.contains(now, val)) {
+                        now.push(val);
+                    }
+                });
+                return now;
+            } else {
+                return _.filter(now, function (val) {
+                    // return next.indexOf(val) !== -1;
+                    return _.contains(next, val);
+                })
+            }
+        }, [])
     });
 
     _.difference = restArguments(function(list, others) {
@@ -385,12 +435,16 @@
     })
 
     var unzipFn = function (lists) {
-        if (!_.isArrayLike(lists)) return;
+        if (!_.isArrayLike(lists)) return [];
         var ret = [];
+        var maxLength = _.max(lists, function(list) {
+            var len = list && list.length;
+            return _.isNumber(len) ? len : 0;
+        }).length;
         for (var i = 0; i < lists.length; i++) {
             var list = lists[i];
             if (!_.isArrayLike(list)) continue;
-            for (var idx = 0; idx < list.length; idx++) {
+            for (var idx = 0; idx < maxLength; idx++) {
                 if (!has(ret, idx)) {
                     ret[idx] = [list[idx]]
                 } else {
@@ -415,7 +469,7 @@
     _.object = function(keys, values) {
         var lists, ret = {};
         if(!values) lists = keys;
-        if(!_.isArrayLike(keys)) return;
+        if(!_.isArrayLike(keys)) return {};
 
         if(!values) {
             _.each(lists, function(list) {
@@ -431,61 +485,68 @@
     }
 
     _.chunk = function(list, length) {
-        if(!length) return [];
+        if(length <= 0 || length == null) return [];
         if(!_.isArrayLike(list)) return;
         var ret = [];
         length = typeof length === 'number' ? Math.ceil(length) : 1;
         length = Math.min(length, list.length);
-        // debugger;
-        for(var i = 0; i < list.length && i > 0; i += length) {
+        for(var i = 0; i < list.length && i >= 0; i += length) {
             ret.push(list.slice(i, i + length))
         }
         return ret;
     }
 
-    var createIndexFn = function(dir) {
-        return function (list, value, isSorted, fromIndex) {
-            if (!_.isBoolean(isSorted)) {
-                if(dir === 1) 
-                    fromIndex = isSorted || 0;
-                else 
-                    fromIndex = isSorted || Math.max(list.length - 1, 0);
-                isSorted = false;
+    
+    var createFindIndexFn = function(dir) {
+        return function(list, predicate, context) {
+            if(!_.isArrayLike(list)) return -1;
+            predicate = cb(predicate, context);
+            for(var i = dir === -1 ? Math.max(list.length - 1, 0) : 0; i < list.length && i >= 0; i += dir) {
+                if(predicate(list[i], i, list)) break;
             }
-            if(_.isBoolean(isSorted)) {
-                if (dir === 1)
-                    fromIndex = fromIndex || 0;
+            return i === list.length ? -1 : i;
+        }
+    }
+
+    _.findIndex = createFindIndexFn(1);
+
+    _.findLastIndex = createFindIndexFn(-1);
+
+    // neg number!!
+    var createIndexFn = function(dir, predicateFind, sortedIndex) {
+        return function (list, value, fromIndex) {
+            if(!_.isArrayLike(list)) return -1;
+            var length = getLength(list), i = 0;
+            if (_.isNumber(fromIndex)) {
+                if(dir >= 0) 
+                    // to set the iterator startedNumber
+                    i = fromIndex >= 0 ? fromIndex : Math.max(length + fromIndex, i);
                 else
-                    fromIndex = fromIndex || Math.max(list.length - 1, 0);
+                    // to set the iterator length
+                    length = fromIndex >= 0 ? Math.min(fromIndex + 1, length) : fromIndex + length + 1;
+            } 
+            else             
+            // why sequence by sortedIndex , fromIndex, length ?
+            if(sortedIndex && fromIndex && length) {
+                i = sortedIndex(list, value);
+                return list[i] === value ? i : -1;
             }
-            
-            var half;
-            // to check
-            if(isSorted && dir !== -1) {
-                half = Math.floor(list.length / 2);
-                for(var i = half; i < list.length; i = half) {
-                    if(value < list[i]) {
-                        half = Math.floor(half - half / 2);
-                    } else {
-                        half = Math.floor(half + half / 2);
-                    }
-                    if(value === list[i])
-                        return i;
-                }
-            } else {
-                for (var i = fromIndex; i >= 0 && i < list.length; i += dir) {
-                    if (value === list[i])
-                        return i;
-                }
+            // isNaN
+            if(value !== value) {
+                fromIndex = predicateFind(slice.call(list, i, length), _.isNaN);
+                // add the offset
+                return fromIndex >= 0 ? fromIndex + i : -1;
+            }
+
+            for (i = dir >= 0 ? i : length - 1; i >= 0 && i < length; i += dir) {
+                if (value === list[i])
+                    return i;
             }
             return -1;
         }
     }
 
-    _.indexOf = createIndexFn(1);
-
-    _.lastIndexOf = createIndexFn(-1);
-
+    
     _.sortedIndex = function(list, value, iteratee, context) {
         iteratee = cb(iteratee, context);
         var currentVal = iteratee(value);
@@ -501,30 +562,21 @@
         return i;
     }
 
-    var createFindIndexFn = function(dir) {
-        return function(list, predicate, context) {
-            predicate = cb(predicate, context);
-            for(var i = dir === -1 ? Math.max(list.length - 1, 0) : 0; i < list.length && i >= 0; i += dir) {
 
-                if(predicate(list[i], i, list)) break;
-            }
-            return i === list.length ? -1 : i;
-        }
-    }
+    _.indexOf = createIndexFn(1, _.findIndex, _.sortedIndex);
 
-    _.findIndex = createFindIndexFn(1);
+    _.lastIndexOf = createIndexFn(-1, _.findLastIndex);
 
-    _.findLastIndex = createFindIndexFn(-1);
 
     _.range = function(start, stop, step) {
         if(!_.isNumber(stop)) {
             stop = start || 0;
             start = 0;
         }
-        step = step || 1;
+        step = step || (start > stop ? -1 : 1);
         // var tmp;
         var ret = [];
-        for (var i = start; start > stop ? (i > stop && i < start) : (i < stop && i > start); i += step) {
+        for (var i = start; start > stop ? (i > stop && i <= start) : (i < stop && i >= start); i += step) {
             ret.push(i);
         }
         return ret;
@@ -981,7 +1033,7 @@
     _.filter = _.select = function (list, predicate, context) {
         predicate = cb(predicate, context);
         var ret, i;
-        if (_.isArray(list)) {
+        if (_.isArrayLike(list)) {
             ret = [];
             for (i = 0; i < list.length; i++) {
                 if (predicate(list[i], i, list)) {
@@ -1085,22 +1137,21 @@
     // how to faster resolve ?
     // to avoid use contains or indexOf,just to distinguish previous variable and now variable;
     _.uniq = _.unique = function (list, isSorted, iteratee, context) {
-        if (_.isArrayLike(list)) return;
-        if (_.isBoolean(isSorted)) {
+        if (!_.isArrayLike(list)) return [];
+        if (!_.isBoolean(isSorted)) {
             context = iteratee;
             iteratee = isSorted;
             isSorted = false;
         }
-
-        if (iteratee) iteratee = cb(iteratee, context);
-
+        if (iteratee != null) iteratee = cb(iteratee, context);
+        
         var seen = [];
         var ret = [];
 
         for (var i = 0; i < list.length; i++) {
             var val = list[i];
             var computed = iteratee ? iteratee(val, i, list) : val;
-            if (isSorted || !iteratee) {
+            if (isSorted && !iteratee) {
                 if (!i || seen !== computed) {
                     ret.push(val);
                     // seen = computed;
@@ -1295,7 +1346,7 @@
             })
             return ret;
         }
-        if(_.isArray(list)) {
+        if(_.isArrayLike(list)) {
             ret = [[], []]
             list = _.clone(list);
             _.each(list, function(val, key, list) {
@@ -1311,56 +1362,29 @@
     }
 
     _.compact = function(list) {
-        return _.partition(list, !_.negate(Boolean))[0];
+        return _.partition(list, _.negate(Boolean))[1];
     }
 
-    _.first = _.head = _.take = function(list, n) {
-        if(!_.isArrayLike(list)){
-            if(typeof n === 'number')
-                return [];
-            else return;
-        }
-        var length = Math.max(list.length, 0);
-        if(length === 0) return [];
-        if (typeof n !== 'number') n = 0;
-        n = n || 0;
-        if(n === 1) {
-            return list[0];
-        } else {
-            return list.slice(0, Math.min(n, length));
-        }
+    _.first = _.head = _.take = function(list, n, guard) {
+        if(!_.isArrayLike(list) || list.length < 1) return !_.isNumber(n) ? void 0 : [];
+        if(!_.isNumber(n) || guard) return list[0];
+        return _.initial(list, list.length - n);
     }
 
-    _.initial = function(list, n) {
-        if (!_.isArrayLike(list)) return;
-        var length = Math.max(list.length - 1, 0);
-        if (typeof n !== 'number') n = length;
-        if (!n) n = n || length;
-        else n = Math.max(list.length - n, 0);
-
-        return list.slice(0, Math.min(n, Math.max(list.length, 0)));
+    _.initial = function(list, n, guard) {
+        if(!_.isArrayLike(list) || list.length < 1) return [];
+        return slice.call(list, 0, Math.max(0, Math.min(list.length - (!_.isNumber(n) || guard ? 1 : n), list.length)));
     }
 
-    _.last = function(list, n) {
-        if (!_.isArrayLike(list)) return;
-        var length = Math.max(list.length - 1, 0);        
-        if (typeof n !== 'number') n = 1;
-
-        n = n || 1;
-        if (n === 1) {
-            return list[length];
-        } else {
-            return list.slice(Math.max(list.length - n, 0), Math.max(list.length, 0));
-        }
+    _.last = function(list, n, guard) {
+        if(!_.isArrayLike(list) || list.length < 1) return !_.isNumber(n) ? void 0 : [];
+        if(!_.isNumber(n) || guard) return list[list.length - 1];
+        return _.rest(list, list.length - n);
     }
 
-    _.rest = _.drop = _.tail = function(list, n) {
-        if (!_.isArrayLike(list)) return;
-        var length = Math.max(list.length - 1, 0);
-        if (typeof n !== 'number') n = 1;
-
-        n = n || 1;
-        return list.slice(Math.max(n, 0), Math.max(list.length, 0));
+    _.rest = _.drop = _.tail = function(list, n, guard) {
+        if(!_.isArrayLike(list) || list.length < 1) return [];
+        return slice.call(list, Math.max(!_.isNumber(n) || guard ? 1 : n, 0), list.length);
     }
 
     _.debounce = function(fn, delay, immediate) {
@@ -1579,9 +1603,9 @@
     // how it work ?
     // !predicate.apply(this, arguments)
     _.negate = function(predicate) {
-        return _.wrapperByArgsNumber(function () {
+        return function () {
             return !predicate.apply(this, arguments);
-        }, true);
+        };
     };
 
 
