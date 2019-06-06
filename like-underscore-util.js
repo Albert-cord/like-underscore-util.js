@@ -150,13 +150,21 @@
 
     _.deepGet = function(propArray) {
         return function(obj) {
-            if(_.isObject(obj)) {
-                for (var i = 0; i < propArray.length; i++) {
-                    obj && (obj = obj[propArray[i]]);
-                }
-                return obj;
+            // if(_.isObject(obj)) {
+
+            // }
+            var length = propArray.length
+            for (var i = 0; i < length; i++) {
+                if(obj && (obj = obj[propArray[i]]));
+                else break;
             }
-            return;
+            if(i >= Math.max(length - 1, 0))
+                return obj;
+            else {
+                return obj || undefined;
+            }
+            // return obj;
+            // return;
         }
     }
 
@@ -324,18 +332,38 @@
     var createReduceFn = function (step) {
         
         return function (list, iteratee, initVariable, context) {
-            if(!_.isArrayLike(list)) list = _.values(list);
-            if(!list.length) return;           
-            if(list.length === 1) return list[0];
-            iteratee = cb(iteratee, context, 4);
-            var i = step > 0 ? 0 : list.length - 1;
-            if (initVariable == undefined) {
-                initVariable = list[i];
-                i += step;
+            var keys = _.isArrayLike(list) ? list.length : _.keys(list);
+            if((list == null || list.length === 0 || (keys && keys.length === 0)) && initVariable != null) return initVariable;           
+            if(list && (list.length === 1 || (keys && keys.length) === 1)) {
+                if(_.isArrayLike(list)){
+                    return list[0];
+                }
+                else {
+                    return list[keys[0]];
+                } 
             }
-            var length = list.length;
+            iteratee = cb(iteratee, context, 4);
+            var i;
+            if(_.isArrayLike(list)) {
+                i = step > 0 ? 0 : list.length - 1;
+                if (initVariable == undefined) {
+                    initVariable = list[i];
+                    i += step;
+                }
+            } else {
+                i = step > 0 ? 0 : keys.length - 1;
+                if (initVariable == undefined) {
+                    initVariable = list[keys[i]];
+                    i += step;
+                }
+            }
+            var length = _.isArrayLike(list) ? keys : keys.length;
             for (; i >= 0 && i < length; i += step) {
-                initVariable = iteratee(initVariable, list[i], i, list);
+                if(_.isArrayLike(list)) {
+                    initVariable = iteratee(initVariable, list[i], i, list);
+                } else {
+                    initVariable = iteratee(initVariable, list[keys[i]], keys[i], list);
+                }
             }
             
             return initVariable;
@@ -430,19 +458,27 @@
         }, [])
     });
 
-    _.difference = restArguments(function(list, others) {
-        list = _.clone(list);
-        if(!_.isArrayLike(list)) return;
-
-        return _.reduce(others, function(now, next) {
+    _.difference = restArguments(function(lists) {
+        
+        if (!_.isArrayLike(lists)) return;
+        if(_.contains(lists, null)) return [];
+        return _.reduce(lists, function (now, next) {
             if (!_.isArrayLike(now)) return _.isArrayLike(next) ? next : [];
             if (!_.isArrayLike(next)) return _.isArrayLike(now) ? now : [];
-
-            return _.filter(now, function(val) {
-                return next.indexOf(val) === -1;
-            })
-        }, list)
-        
+            if(now.length === 0) {
+                _.each(next, function(val) {
+                    if(!_.contains(now, val)) {
+                        now.push(val);
+                    }
+                });
+                return now;
+            } else {
+                return _.filter(now, function (val) {
+                    // return next.indexOf(val) !== -1;
+                    return !_.contains(next, val);
+                })
+            }
+        }, [])
     })
 
     var unzipFn = function (lists) {
@@ -830,10 +866,10 @@
         }
     });
 
-    _.isElement = _.wrapperByArgsNumber(function (node) {
+    _.isElement = function (node) {
         if(typeof HTMLElement === 'object') return node instanceof HTMLElement;
         return _.isObjectLike(node) && node.nodeType === 1 && typeof node.nodeName === 'string'
-    });
+    }
 
     //    _.isArguments = _.wrapperByArgsNumber(function (args) {
     //     return _.isArrayLike(args) && (typeof args.callee === 'function')
@@ -871,7 +907,8 @@
 
 
     _.keys = _.objects = function(obj) {
-        if(!_.isObject(obj)) return [];
+        // fix bug:no use for no-object;
+        if (obj == null) return [];
         var keys = Object.keys;
         if(keys) {
             return keys(obj);
@@ -886,7 +923,8 @@
     }
 
     _.allKeys = _.allObjects = function (obj) {
-        if (!_.isObject(obj)) return [];
+        // fix bug:no use for no-object;
+        if (obj == null) return [];
         var keys = Object.keys;
         if (keys) {
             return keys(obj);
@@ -1054,12 +1092,15 @@
                 }
             }
         } else {
-            ret = {}
+            // why return a array instead of object?
+            // ret = {};
+            ret = [];
             var keys = _.keys(list);
             length = keys.length;
             for (i = 0; i < length; i++) {
                 if (predicate(list[keys[i]], keys[i], list)) {
-                    ret[keys[i]] = list[keys[i]];
+                    // ret[keys[i]] = list[keys[i]];
+                    ret.push(list[keys[i]]);                    
                 }
             }
         }
@@ -1067,10 +1108,10 @@
     }
 
     var isObjHasProperties = function (obj, properties, keys) {
-        if(_.isObject(obj)) return false;
+        // if(!_.isObject(obj)) return false;
         for (var i = 0, key; i < keys.length; i++) {
             key = keys[i];
-            if (!obj[key] || obj[key] !== properties[key]) return false;
+            if (!has(obj, key) || obj[key] !== properties[key]) return false;
         }
         return true;
     }
@@ -1128,16 +1169,21 @@
         return ret == undefined ? [] : ret;
     }
 
-    _.contains = _.includes = _.include = function (list, value, fromIndex) {
+    _.contains = _.includes = _.include = function (list, value, fromIndex, guard) {
         var values, index;
-        if(_.isArray(list)) {
-            fromIndex = fromIndex > 0 ? Math.min(fromIndex, list.length - 1) : 0;
-            index = list.indexOf(value);
+        if(list == null) return false;
+        if(typeof fromIndex !== 'number' || guard) fromIndex = 0;
+        if(_.isArrayLike(list)) {
+            fromIndex = fromIndex >= 0 ? Math.min(fromIndex, Math.max(list.length - 1, 0)) : Math.max(list.length + fromIndex, 0);
+            // index = list.indexOf(value);
+            index = _.indexOf(list, value, fromIndex);
             if(index >= fromIndex) return true;
-        } else {
+        }
+        if(_.isObject(list)) {
             values = _.values(list);
-            fromIndex = fromIndex > 0 ? Math.min(fromIndex, values.length - 1) : 0;
-            index = values.indexOf(value);
+            fromIndex = fromIndex >= 0 ? Math.min(fromIndex, Math.max(values.length - 1, 0)) : Math.max(list.length + fromIndex, 0);
+            // index = values.indexOf(value);
+            index = _.indexOf(values, value, fromIndex);
             if(index >= fromIndex) return true;
         }
         return false;
@@ -1190,10 +1236,37 @@
 
     _.invoke = restArguments(function(list, methodName, args) {
         var result = _.isArray(list) ? [] : {};
-
+        var deepMethod, context;
+        if(!_.isArray(args)) {
+            methodName = methodName[0];
+        }
         _.each(list, function (val, index, list) {
-            // other variable how to operation ?
-            typeof val[methodName] === 'function' && (result[index] = val[methodName].apply(null, args));
+
+            if(typeof methodName === 'function') {
+                result[index] = methodName.apply(val, args);
+            } else if(_.isArray(methodName)) {
+                deepMethod = _.deepGet(methodName)(val);
+                if(typeof deepMethod === 'function') {
+                    context = _.deepGet(methodName.slice(0,-1))(val);
+                    result[index] = deepMethod.apply(context, args);
+                } else {
+                    if(deepMethod == null)
+                        return result.push(deepMethod);
+                }
+            } else {
+                // other variable how to operation ?
+                if(typeof val[methodName] === 'function') {
+                    result[index] = val[methodName].apply(val, args);
+                } else {
+                    if(val[methodName] == null)
+                        result[index] = val[methodName];
+                }
+                if(typeof val[methodName] !== 'function' && val[methodName] != null) {
+                    throw new TypeError('non-functions');
+                }
+            }
+
+
         })
 
         return result;
@@ -1204,20 +1277,36 @@
         if(_.isArray(list)) {
             _.each(list, function(val, index, list) {
                 if(_.isObject(val)) {
-                    val[propertyName] && (result.push(val));
+                    // call has?
+                    if(propertyName in val) {
+                        result.push(val[propertyName]);
+                    } else {
+                        result.push(undefined);
+                    }
                 }
             })
         }
         return result;
     }
 
+    // how to assure execute iteratee and execute mapFn has non-iteratee...
     _.max = function(list, iteratee, context) {
         var maxVal = -Infinity, max, current;
         if(_.isEmpty(list)) return maxVal;
-        iteratee = cb(iteratee, context);
+        if(!_.isUndefined(iteratee)) {
+            // fix bug:_.map's iteratee
+            if(context && context[iteratee] == list) {
+                iteratee = cb();
+            } else 
+                iteratee = cb(iteratee, context);
+        } else {
+            iteratee = cb();
+        }
         _.each(list, function(val, index, list) {
             current = iteratee(val, index, list);
-            if(current > maxVal) {
+            current = _.isString(current) ? Number(iteratee(val, index, list)) : current;
+            if(max == null && ((!_.isNaN(current) && _.isNumber(current)) || _.isDate(current))) max = val;
+            if(current > maxVal && ((!_.isNaN(current) && _.isNumber(current)) || _.isDate(current))) {
                 maxVal = current;
                 max = val;
             }
@@ -1229,10 +1318,20 @@
 
         var minVal = Infinity, min, current;
         if(_.isEmpty(list)) return minVal;
-        iteratee = cb(iteratee, context);
+        if(!_.isUndefined(iteratee)) {
+            // fix bug:_.map's iteratee
+            if(context && context[iteratee] == list) {
+                iteratee = cb();
+            } else 
+                iteratee = cb(iteratee, context);
+        } else {
+            iteratee = cb();
+        }
         _.each(list, function(val, index, list) {
             current = iteratee(val, index, list);
-            if(current < minVal) {
+            current = _.isString(current) ? Number(iteratee(val, index, list)) : current;
+            if(min == null && ((!_.isNaN(current) && _.isNumber(current)) || _.isDate(current))) min = val;
+            if(current < minVal && ((!_.isNaN(current) && _.isNumber(current)) || _.isDate(current))) {
                 minVal = current;
                 min = val;
             }
@@ -1331,35 +1430,44 @@
         }
     }
 
+    // what's some symbols?
+    var reStrSymbol = /[^\ud800-\udfff]|[\ud800-\udbff][\udc00-\udfff]|[\ud800-\udfff]/g;
+
     _.toArray = function(anything) {
         if(_.isObject(anything)) return _.values(anything);
-        if(_.isArrayLike(anything)) return _.clone(anything);
+        if(_.isArray(anything)) return _.clone(anything);
+        if(_.isString(anything)) return anything.match(reStrSymbol) || [];
+        if(_.isArrayLike(anything)) return slice.call(anything, 0);
         return [anything];
     }
 
     _.size = function(list) {
-        if(_.isObject(list)) return _.values(list).length;
+        if(_.isString(list)) return getLength(list) || 0;
+        if(_.isObject(list) && !_.isArrayLike(list)) return _.values(list).length;
         if(_.isArrayLike(list)) return list.length;
-        return;
+        return 0;
     }
 
-    _.partition = function(list, iteratee) {
-        iteratee = cb(iteratee);
+    _.partition = function(list, iteratee, context) {
+        iteratee = cb(iteratee, context);
         var ret, keys;
         if(_.isObject(list)) {
-            ret = [{}, {}]
+            // ret = [{}, {}];
+            ret = [[], []];
             keys = _.keys(list);
             _.each(keys, function(key, i, keys) {
                 if(iteratee(list[key], key, list)) {
-                    ret[0][key] = list[key];
+                    ret[0].push(list[key]);
+                    // ret[0][key] = list[key];
                 } else {
-                    ret[1][key] = list[key];
+                    ret[1].push(list[key]);
+                    // ret[1][key] = list[key];
                 }
             })
             return ret;
         }
         if(_.isArrayLike(list)) {
-            ret = [[], []]
+            ret = [[], []];
             list = _.clone(list);
             _.each(list, function(val, key, list) {
                 if(iteratee(val, key, list)) {
