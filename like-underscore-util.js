@@ -864,43 +864,136 @@
         return typeof obj === 'object' && obj !== null;
     };
 
+    var eq = function(a, b, aStack, bStack) {
+        // why ? +0, -0 !==, convert to compare Infinity;
+        if( a === b ) return a !== 0 || 1 / a === 1 / b;
+        // why ?
+        if(a == null || b == null) return false;
+        if(a !== a) return b !== b;
+
+        var type = typeof a;
+        // a is not a function(class) and object,so false
+        // b like a
+        if(type !== 'function' && type !== 'object' && typeof b !== 'object')
+            return false;
+        return deepEq(a, b, aStack, bStack);
+    }
+
+    var SymbolProto = Symbol.prototype;
+
+    var deepEq = function(a, b, aStack, bStack) {
+        if(a instanceof _) a = a._wrapped;
+        if(b instanceof _) b = b._wrapped;
+
+        var className = toString.call(a);
+        if(className !== toString.call(b)) return false;
+
+        switch(className) {
+        // use string
+        case '[object RegExp]':
+        case '[object String]':
+
+            return '' + a === '' + b;
+        // use number
+        case '[object Number]':
+            if(+a !== +a) return +b !== +b;
+            return +a === 0 ? 1 / +a === 1 / +b : +a === +b;
+
+        case '[object Date]':
+        case '[object Boolean]':
+            // use number
+            return +a === +b;
+        case '[object Symbol]':
+            return SymbolProto.valueOf.call(a) === SymbolProto.valueOf.call(b);
+        }
+
+        var areArrays = className === '[object Array]';
+
+        if(!areArrays) {
+            // yet not object, so false
+            if(typeof a !== 'object' || typeof b !== 'object') return false;
+
+            // compare constructor but not frames's Object or Array
+
+            var aCtor = a.constructor, bCtor = b.constructor;
+            if(aCtor !== bCtor && !(_.isFunction(aCtor) && aCtor instanceof aCtor &&
+            _.isFunction(bCtor) && bCtor instanceof bCtor) && ('constructor' in a && 'constructor' in b)) {
+                return false;
+            }
+        }
+
+        // first time stack init from a empty array;
+        aStack = aStack || [];
+        bStack = bStack || [];
+        var length = aStack.length;
+        while(length--) {
+            // if circular-reference
+            if(aStack[length] === a) return bStack[length] === b;
+        }
+
+        aStack.push(a);
+        bStack.push(b);
+
+        if(areArrays) {
+            length = a.length;
+            if(length !== b.length) return false;
+            while(length--) {
+                if(!eq(a[length], b[length], aStack, bStack)) return false;
+            }
+        } else {
+            var keys = _.keys(a), key;
+            length = keys.length;
+            if(length !== _.keys(b).length) return false;
+            while(length--) {
+                key = keys[length];
+                if(!(has(b, key) && eq(a[key], b[key], aStack, bStack))) return false;
+            }
+        }
+        // just for gc?
+        aStack.pop();
+        bStack.pop();
+        return true;
+    }
+
     _.isDeepEqual = _.isEqual = function (obj, other) {
         // how to easy to check isEqual?
         // only property ?or prototype ?
         // to check prototype chain 
-        if(_.isObject(obj, other)) {
+        // if(_.isObject(obj, other)) {
 
-            return obj == other || (function(obj, other) {
-                var checkedObj = [];
-                var objKeys = _.allKeys(obj);
-                var otherKeys = _.allKeys(other);
-                if(objKeys.length !== otherKeys.length) return false;
-                for(var i = 0, o, ot; i < objKeys.length; i++) {
-                    o = obj[objKeys[i]];
-                    ot = other[otherKeys[i]];
-                    if(checkedObj.indexOf(o) !== -1 && checkedObj.indexOf(o) !== -1 && o != ot) {
-                        checkedObj = null;
-                        return false;
-                    } 
-                    if(_.isObjectLike(o, ot) && (checkedObj.push(o, ot), !_.isDeepEqual(o, ot))) {
-                        checkedObj = null;                        
-                        return false;
-                    } else {
-                        checkedObj = null;
-                        if(!_.isObjectLike(o) && !_.isObjectLike(ot) && ot !== o) {
-                            checkedObj = null;
-                            return false
-                        } else {
-                            checkedObj = null;
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            })(obj, other)        
-        } else {
-            return obj === other;
-        }
+        //     return obj == other || (function(obj, other) {
+        //         var checkedObj = [];
+        //         var objKeys = _.allKeys(obj);
+        //         var otherKeys = _.allKeys(other);
+        //         if(objKeys.length !== otherKeys.length) return false;
+        //         for(var i = 0, o, ot; i < objKeys.length; i++) {
+        //             o = obj[objKeys[i]];
+        //             ot = other[otherKeys[i]];
+        //             if(checkedObj.indexOf(o) !== -1 && checkedObj.indexOf(o) !== -1 && o != ot) {
+        //                 checkedObj = null;
+        //                 return false;
+        //             } 
+        //             if(_.isObjectLike(o, ot) && (checkedObj.push(o, ot), !_.isDeepEqual(o, ot))) {
+        //                 checkedObj = null;                        
+        //                 return false;
+        //             } else {
+        //                 checkedObj = null;
+        //                 if(!_.isObjectLike(o) && !_.isObjectLike(ot) && ot !== o) {
+        //                     checkedObj = null;
+        //                     return false
+        //                 } else {
+        //                     checkedObj = null;
+        //                     return false;
+        //                 }
+        //             }
+        //         }
+        //         return true;
+        //     })(obj, other)        
+        // } else {
+        //     return obj === other;
+        // }
+
+        return (obj === other && obj !== 0) || eq(obj, other);
 
     }
 
