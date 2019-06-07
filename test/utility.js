@@ -284,7 +284,7 @@
         } catch (ex) {
             source = ex.source;
         }
-        assert.ok(/__p/.test(source));
+        assert.ok(/__source/.test(source));
     });
 
     QUnit.test('_.template handles \\u2028 & \\u2029', function(assert) {

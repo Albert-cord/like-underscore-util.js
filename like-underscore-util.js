@@ -2007,10 +2007,12 @@
     };
 
     _.times = function (n, iteratee, context) {
+        var result = [];
         iteratee = cb(iteratee, context);
         for(var i = 0; i < n; i++) {
-            iteratee(i+1);
+            result.push(iteratee(i));
         }
+        return result;
     };
 
     _.random = function (min, max) {
@@ -2055,13 +2057,46 @@
 
     _.escape = createEscapeFn(escapeMap);
     _.unescape = createEscapeFn(unescapeMap);
-    
-    _.result = function (obj, property, defaultVal) {
-        var ret = _.property(property)(obj);
-        if(ret !== undefined) {
-            return typeof ret === 'function' ? ret.call(obj) : ret;
+
+    _.result = function(obj, property, defaultVal) {
+        if(obj == null) return typeof defaultVal === 'function' ? defaultVal() : defaultVal;
+        var result, i, length, context;
+
+        if(_.isArrayLike(property)) {
+            length = property.length;
+            result = obj && obj[property[0]];
+            context = (obj && obj[property[0]]);
+
+            for(i = 1; i < length; i++) {
+                if(typeof result === 'function') {
+                    result = result() && result()[property[i]];
+                } else {
+                    result = result && result[property[i]]
+                }
+
+                if(i !== length - 1) {
+                    
+                    if(typeof context === 'function') {
+                        // context = context() && context()[property[i]]
+                        context = context.apply(obj) && context.apply(obj)[property[i]]
+                    } else {
+                        context = context && context[property[i]]
+                    }
+                }
+            }
+            context = typeof context === 'function' ? context.apply(obj) : context;
+            // context = typeof context === 'function' ? context() : context;
         } else {
-            return typeof defaultVal === 'function' ? defaultVal.call(obj) : defaultVal;
+            result = obj && obj[property];
+            context = obj;
+        }
+
+        if(result !== undefined) {
+            return typeof result === 'function' ? result.call(context) : result;
+        } else {
+            // return typeof defaultVal === 'function' ? defaultVal.call(obj) : defaultVal;
+            // return typeof defaultVal === 'function' ? defaultVal.call(context) : defaultVal;
+            return typeof defaultVal === 'function' ? defaultVal.call(context || obj) : defaultVal;
         }
     }
 
@@ -2526,5 +2561,8 @@
 
 })()
 
-// to do:test module;
-// to do:add to npm packages
+// to do:like-underscore --->O
+// to do:add some useful method --->O
+// to do:test module; --->O
+// to do:add CI test module --->X
+// to do:add to npm packages --->X
