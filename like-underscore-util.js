@@ -34,7 +34,8 @@
     var MAX_ARRAY_INDEX = Math.pow(2, 53) - 1;
 
     var builtinIteratee = _.iteratee = function (value, context) {
-        return cb(value, context);
+        // fix bug:argCount will be set undefined and reset to 3;
+        return cb(value, context, Infinity);
     }
     var noop = function() {};
     _.noop = noop;
@@ -82,45 +83,62 @@
 
     var shallowProperty = function (prop) {
         return function (obj) {
+            if(prop == null || obj == null) return;
             return obj && obj[prop];
         }
     }
     var getLength = shallowProperty('length');
 
-    var restArguments = function(fn) {
+    var restArguments = function(fn, index) {
         var length = fn && fn.length || 0;
 
         return function() {
-            if (length >= arguments.length && length != 1) {
-                // the last one will not be array
-                var args = [].slice.call(arguments);
-                // log(args)
-                args[args.length - 1] = [args[args.length - 1]];
-                // if(args.length === 1) args = [args];
+            var args;
+            if(_.isNumber(index)) {
+                args = [];
+                args[index] = [].slice.call(arguments);
                 return fn.apply(this, args);
             } else {
-                var args = Array(length);
-                for(var i = 0; i < length - 1; i++) {
-                    args[i] = arguments[i];
-                }
-                args[i] = [].slice.call(arguments, length - 1);
+                var argLength = arguments.length;
+                // 
+                if (length > argLength && length != 1) {
+                    // the last one will not be array
+                    args = [].slice.call(arguments);
+                    // log(args)
+                    // var pos = Math.max(0, args.length - 1);
+                    // if(args.length !== 0) {
+                    //     args[pos] = [args[pos]];
+                    // }
+                    if(args.length < length) {
+                        args[length - 1] = [];
+                    }
+                    // if(args.length === 1) args = [args];
+                    return fn.apply(this, args);
+                } else {
+                    args = Array(length);
+                    for(var i = 0; i < Math.max(0, length - 1); i++) {
+                        args[i] = arguments[i];
+                    }
+                    args[i] = [].slice.call(arguments, length - 1);
 
-                return fn.apply(this, args);
+                    return fn.apply(this, args);
+                }
             }
+            
         }
     }
 
-    _.wrapperByArgsNumber = function (fn, mode) {
+    var wrapperByArgsNumber =  _.wrapperByArgsNumber = function (fn, mode) {
         return function (target) {
             if (arguments.length <= 1) {
                 return fn.call(null, target);
             } else {
                 if (mode === !0) {
-                    return _.every(arguments, function (i, arg) {
+                    return _.every(arguments, function (arg, i) {
                         return fn.call(null, arg);
                     })
                 } else {
-                    return _.some(arguments, function (i, arg) {
+                    return _.some(arguments, function (arg, i) {
                         return fn.call(null, arg);
                     })
                 }
@@ -128,13 +146,13 @@
         }
     };
 
-    _.isArrayLike = _.wrapperByArgsNumber(function (obj) {
+    _.isArrayLike = function (obj) {
         if (typeof obj === 'object' && obj !== null) {
             var length = shallowProperty('length')(obj);
             if (typeof length === 'number' && 0 <= length && MAX_ARRAY_INDEX >= length) return true;
         }
         return false;
-    }, true)
+    };
 
     _.identity = function(value) {
         return value;
@@ -153,7 +171,8 @@
             // if(_.isObject(obj)) {
 
             // }
-            var length = propArray.length
+            var length = propArray.length;
+            if(length === 0) return;
             for (var i = 0; i < length; i++) {
                 if(obj && (obj = obj[propArray[i]]));
                 else break;
@@ -161,7 +180,7 @@
             if(i >= Math.max(length - 1, 0))
                 return obj;
             else {
-                return obj || undefined;
+                return obj == null ? undefined : obj;
             }
             // return obj;
             // return;
@@ -175,12 +194,16 @@
             _.each(path, function (p, i, path) {
                 obj && (obj = obj[p]);
             })
-            return obj;
+            // why ? obj is null, but directly return null, qunit will read as undefined.
+            return obj == null ? null : obj;
         }
     }
 
     _.matcher = _.matches = function(attrs) {
-        attrs = _.extend({}, attrs);
+        // fix bug: spec is restricted to own properties;
+        // not for all
+        // but for isMatch fn is for empty-Object, so return true
+        attrs = _.extendOwn({}, attrs);
         return function(obj) {
 
             return _.isMatch(obj, attrs);
@@ -188,12 +211,17 @@
     }
 
     _.isMatch = function(obj, attrs) {
+        if(obj == null && ((_.isRealObject(attrs) && _.isEmpty(attrs)) || attrs == null)) return true;
         if (!_.isObject(obj) && !_.isArrayLike(obj)) return false;
 
         for(var prop in attrs) {
             if(has(attrs, prop)) {
                 // how it works on reference type?
-                if(!has(obj, prop) || obj[prop] !== attrs[prop]) return false;
+                if(!(prop in obj) || (has(obj, prop) && obj[prop] !== attrs[prop])) return false;
+                // if(!(prop in obj)) {
+                //     if(!has(obj, prop) && obj[prop] !== attrs[prop])
+                //         return false;
+                // }
             }
         }
         return true;
@@ -633,48 +661,83 @@
 
     // how to new instance ?
     _.bind = restArguments(function (fn, obj, args) {
+        if(!_.isFunction(fn)) throw new TypeError('must bind to a function');
         if(!_.isArray(args)) {
             // fix bug: [undefined]
             // args = [args];
             args = [];
             obj = obj && obj[0];
         }
-        return restArguments(function (innerArgs) {
-
-            return fn.apply(obj, args.concat(innerArgs));
-        })
+        var F = restArguments(function (innerArgs) {
+            if (this instanceof F) {
+                var ret = fn.apply(this, args.concat(innerArgs));
+                // ret.constructor && (ret.constructor = fn);
+                return ret;
+            } else {
+                return fn.apply(obj, args.concat(innerArgs));
+            }
+        });
+        F.prototype = fn.prototype;
+        return F;
     })
 
     _.bindAll = restArguments(function(obj, methodNames) {
+        if(!_.isArray(methodNames) || methodNames.length === 0) throw new Error('bingAll must need a function');
         _.each(methodNames, function(method) {
+            if(_.isUndefined(obj[method])) throw new TypeError('the given key is undefined');
+            if(!_.isFunction(obj[method])) throw new TypeError('the given key is not a function');
+
             if (typeof obj[method] === 'function') {
                 obj[method] = _.bind(obj[method], obj)
             }
         })
     })
 
-    // why to place a placeholder ? eg: _
     _.partial = restArguments(function (fn, args) {
         if(!_.isArray(args)) {
             args = [];
             fn = fn && fn[0];
         }
-        return restArguments(function(innerArgs) {
-            return fn.apply(null, args.concat(innerArgs));
-        })
-    })
+        var F = restArguments(function(innerArgs) {
+            // fix bug:args will be change in the closure;
+            var outterArgs = _.clone(args);
+            _.each(outterArgs, function(param, index) {
+                if(param === _.partial.placeholder) {
+                    if(innerArgs.length !== 0)
+                        outterArgs.splice(index, 1, innerArgs.shift());
+                    else
+                        outterArgs.splice(index, 1, undefined);
+                }
+            })
+
+            if (this instanceof F) {
+                // fix bug: new constructor bind this;
+                // var ret = fn.apply(new fn, args.concat(innerArgs));
+                var ret = fn.apply(this, outterArgs.concat(innerArgs));
+                // log(ret, fn, args.concat(innerArgs))
+                return ret;
+            } else {
+                return fn.apply(this, outterArgs.concat(innerArgs));
+            }
+        });
+        F.prototype = fn.prototype;
+        return F;
+    });
+
+    _.partial.placeholder = defaultLikeUnderscoreUtil;
 
     _.memoize = function(fn, hashFn) {
         // to use lru will avoid stockoverflow
-        var cache = {};
         hashFn = cb(hashFn);
-        return restArguments(function (args) {
+        var F = restArguments(function (args) {
 
             var key = hashFn(args.join(''))
-            if(has(cache, key)) return cache[key];
+            if(has(F.cache, key)) return F.cache[key];
 
-            return cache[key] = fn.apply(null, args);
-        })
+            return F.cache[key] = fn.apply(null, args);
+        });
+        F.cache = {};
+        return F;
     }
 
     _.delay = restArguments(function (fn, wait, args) {
@@ -683,9 +746,9 @@
             wait = wait && wait[0];
             wait = wait || 0;
         }
-
-        setTimeout(function () {
-            fn.apply(null, args);
+        return setTimeout(function () {
+            // fix bug: non-return;
+            return fn.apply(null, args);
         }, wait);
     })
 
@@ -694,7 +757,6 @@
             args = [];
             fn = fn && fn[0];
         }
-
         setTimeout(function() {
             fn.apply(null, args);
         }, 1)
@@ -707,6 +769,8 @@
             // to change the primite to object
             if (!isOverride) obj = Object(obj);
 
+            if(obj == null) return obj;
+
             // var args = arguments.slice(1);
             // to create a variable to save ?
             // var args = slice.call(arguments, 1);
@@ -714,11 +778,15 @@
             // to fix bug:args is not an array
             // if(!_.isArray(args)) args = [args];
             // log(args)
-            if (typeof args === 'undefined' || args.length === 0 || obj === void 0) return obj;
+            if (obj === void 0) return obj;
+            if(!_.isArray(args) && args != null) {
+                args = [args];
+            }
             _.each(args, function (source, i, sources) {
                 var keys = keysFn(source);
                 for (var i = 0, key; i < keys.length, key = keys[i]; i++) {
-                    if (isOverride || obj[key] === void 0) {
+                    // if (isOverride || obj[key] === void 0) {
+                    if (isOverride || !has(obj,key)) {
                         obj[key] = source[key];
                     }
                 }
@@ -750,7 +818,8 @@
     _.functions = _.methods = function(obj) {
         var arr = [];
         for (var prop in obj) {
-            if (hasOwnProperty.call(obj, prop) && _.isFunction(obj[prop])) {
+            // if (hasOwnProperty.call(obj, prop) && _.isFunction(obj[prop])) {
+            if (_.isFunction(obj[prop])) {
                 arr.push(prop);
             }
         }
@@ -763,32 +832,37 @@
         }
     }
 
+    // _.each(['Arguments', 'Function', 'String', 
+    //     'Number', 'Date', 'Symbol', 
+    //     'RegExp', 'Error', 'Map', 
+    //     'WeakMap', 'Set', 'WeakSet'], function (params) {
+    //     _['isArgs' + params] = _.wrapperByArgsNumber(_.isObjectTypeFn(params), true);
+    // });
+
     _.each(['Arguments', 'Function', 'String', 
         'Number', 'Date', 'Symbol', 
         'RegExp', 'Error', 'Map', 
         'WeakMap', 'Set', 'WeakSet'], function (params) {
-        _['is' + params] = _.wrapperByArgsNumber(_.isObjectTypeFn(params), true);
-    })
+        _['is' + params] = _.isObjectTypeFn(params);
+    });
 
-    // _.isFunction = _.wrapperByArgsNumber(function (func) {
-    //     return typeof func === 'function' || false;
-    // }, true);
-
-    // _.isNumber = _.wrapperByArgsNumber(function (num) {
-    //     return typeof (num) === 'number' || toString.call(num) == '[object Number]';
-    // }, true);
-
-    _.isObject = _.wrapperByArgsNumber(function (obj) {
+    _.isRealObject = function (obj) {
         return typeof obj == 'object' && toString.call(obj) == '[object Object]';
-    }, true);
+    };
 
-    _.isArray = _.wrapperByArgsNumber(function (obj) {
+    _.isObject = function (obj) {
+        // return typeof obj == 'object' && toString.call(obj) == '[object Object]';
+        // why not use toString ? and how function can be a object?
+        return (typeof obj == 'object' || typeof obj == 'function') && obj != null;
+    };
+
+    _.isArray = function (obj) {
         return nativeIsArray && nativeIsArray(obj) || toString.call(obj) == '[object Array]';
-    }, true);
+    };
 
-    _.isObjectLike = _.wrapperByArgsNumber(function (obj) {
+    _.isObjectLike = function (obj) {
         return typeof obj === 'object' && obj !== null;
-    }, true)
+    };
 
     _.isDeepEqual = _.isEqual = function (obj, other) {
         // how to easy to check isEqual?
@@ -830,24 +904,28 @@
 
     }
 
-    _.isArray = _.wrapperByArgsNumber(function (obj) {
-        var isArray = Array.isArray;
-        if (isArray)
-            return isArray(obj);
-        else {
-            var length = shallowProperty('length')(obj);
-            if (0 <= length && MAX_ARRAY_INDEX >= length) return true;
-        }
-        return false;
-    }, true);
-
     var has = function(obj, prop) {
-        return hasOwnProperty.call(obj, prop);
+        if(obj == null) return false;
+        if(!_.isArrayLike(prop))
+            return hasOwnProperty.call(obj, prop);
+        else {
+            var length = prop.length;
+            for(var i = 0; i < length; i++) {
+                if(hasOwnProperty.call(obj, prop[i])) {
+                    obj = obj[prop[i]];
+                    if(obj != null)
+                        continue;
+                }
+                return false;
+            }
+            return true;
+        }
     };
 
     _.has = has;
 
-    _.isEmpty = _.wrapperByArgsNumber(function (obj) {
+    _.isEmpty = function (obj) {
+        if(obj == null) return true;
         if(_.isArrayLike(obj)) {
             for(var prop in obj) {
                 if(has(obj, prop)) {
@@ -864,29 +942,20 @@
             }
             return true;
         }
-    });
+        if(_.isString(obj)) return obj.length === 0;
+        if(_.isRegExp(obj)) return obj.source === "(?:)";
+    };
 
     _.isElement = function (node) {
         if(typeof HTMLElement === 'object') return node instanceof HTMLElement;
         return _.isObjectLike(node) && node.nodeType === 1 && typeof node.nodeName === 'string'
     }
 
-    //    _.isArguments = _.wrapperByArgsNumber(function (args) {
-    //     return _.isArrayLike(args) && (typeof args.callee === 'function')
-    //     }, true);
-
-    // _.isString = _.wrapperByArgsNumber(function (str) {
-    //     return typeof str === 'string' || _.isObjectTypeFn('String')(str);
-    // }, true);
-
     _.isNaN = function (num) {
         if(isNaN) return _.isNumber(num) && isNaN(num);
         return num !== num;
     }
 
-    // _.isSymbol = function (symbol) {
-    //     return typeof symbol === 'symbol' || _.isObjectTypeFn('Symbol')(symbol);
-    // }
     //why parseFloat num?
     _.isFinite = function (num) {
         return !_.isSymbol(num) && isFinite(num) && !isNaN(parseFloat(num));
@@ -908,7 +977,7 @@
 
     _.keys = _.objects = function(obj) {
         // fix bug:no use for no-object;
-        if (obj == null) return [];
+        if (obj == null || _.isString(obj)) return [];
         var keys = Object.keys;
         if(keys) {
             return keys(obj);
@@ -924,11 +993,7 @@
 
     _.allKeys = _.allObjects = function (obj) {
         // fix bug:no use for no-object;
-        if (obj == null) return [];
-        var keys = Object.keys;
-        if (keys) {
-            return keys(obj);
-        }
+        if (obj == null || _.isString(obj)) return [];
         var arr = [];
         for (var prop in obj) {
             arr.push(prop);
@@ -947,18 +1012,19 @@
 
     _.pick = restArguments(function(obj, keys) {
         var keyArr = _.keys(obj), iteratee, result = Object.create(null);
+        if(obj == null) return result;
         if(typeof (keys && keys[0])  === 'function') {
-            iteratee = cb(keys[0]);
-            
+            iteratee = cb(keys[0], keys[1]);
             _.each(keyArr, function(key, i, keyArr) {
                 if(iteratee(obj[key], key, obj)) result[key] = obj[key];
             });
         } else {
-            log('keys', keys)
-            iteratee = cb();
-            keys = typeof keys === 'string' ? Array(keys) : keys;
+            // iteratee = cb();
+            keys = _.flatten(keys);
             _.each(keys, function(key, i, keys) {
-                if(iteratee(obj[key], key, obj)) result[key] = obj[key];
+                if(has(obj, key) || obj[key] != null)
+                    result[key] = obj[key];
+                // if(iteratee(obj[key], key, obj)) result[key] = obj[key];
             })
         }
         return result;
@@ -966,29 +1032,45 @@
 
     _.omit = restArguments(function(obj, keys) {
         var keyArr = _.keys(obj), iteratee, result = Object.create(null);
+        if(obj == null) return result;
+        var isArrayLike = _.isArrayLike(obj);
         if(typeof (keys && keys[0]) === 'function') {
-            iteratee = cb(keys[0]);
+            iteratee = cb(keys[0], keys[1]);
             _.each(keyArr, function(key, i, keyArr) {
                 if(!iteratee(obj[key], key, obj)) result[key] = obj[key];
             });
         } else {
-            log('keys', keys)
-            iteratee = cb();
-            keys = typeof keys === 'string' ? Array(keys) : keys;
-            _.each(keys, function(key, i, keys) {
-                if(iteratee(obj[key], key, obj)) result[key] = obj[key];
-            })
+            keys = _.flatten(keys);
+
+            if(isArrayLike) {
+                for(var key in obj) {
+                    if(!_.contains(keys, Number(key))) {
+                        result[key] = obj[key];
+                    }
+                }
+            } else {
+                for(var key in obj) {
+                    if(!_.contains(keys, key)) {
+                        result[key] = obj[key];
+                    }
+                }
+            }
+
+
+            // _.each(obj, function(val, key, obj) {
+            //     if(!_.contains(keys, key)) {
+            //         result[key] = obj[key];
+            //     }
+            // })
         }
         return result;
     })
 
     // to fix bug: args will be array, but createAssigner cannot to accept only
-    _.defaults = restArguments(function (obj, args) {
-        return createAssigner(_.keys, false)(obj, args)
-    });
+    _.defaults = createAssigner(_.keys, false);
 
     _.clone = function (obj) {
-        if(_.isObject(obj)) {
+        if(_.isRealObject(obj)) {
             return _.extend({}, obj);
         }
         if(_.isArray(obj)) {
@@ -1000,7 +1082,7 @@
     _.tap = function (obj, interceptor) {
         interceptor = cb(interceptor);
         //the interceptor will influence obj ?
-        if(_.isObject(obj) || _.isArrayLike(obj)) interceptor(obj);
+        if(_.isObject(obj) || _.isArrayLike(obj) || obj != null) interceptor(obj);
         return obj;
     }
 
@@ -1049,6 +1131,7 @@
     }
 
     _.create = function (prototype, props) {
+        if(!_.isObject(prototype) && !_.isArrayLike(prototype)) return Object.create(null);
         var result = Object.create(prototype || null);
         var keys = _.keys(props);
         if(keys.length === 0) return result;
@@ -1179,7 +1262,7 @@
             index = _.indexOf(list, value, fromIndex);
             if(index >= fromIndex) return true;
         }
-        if(_.isObject(list)) {
+        if(_.isRealObject(list)) {
             values = _.values(list);
             fromIndex = fromIndex >= 0 ? Math.min(fromIndex, Math.max(values.length - 1, 0)) : Math.max(list.length + fromIndex, 0);
             // index = values.indexOf(value);
@@ -1247,7 +1330,8 @@
             } else if(_.isArray(methodName)) {
                 deepMethod = _.deepGet(methodName)(val);
                 if(typeof deepMethod === 'function') {
-                    context = _.deepGet(methodName.slice(0,-1))(val);
+                    // || val -> fix bug: methodName.length === 1, context point to window.
+                    context = _.deepGet(methodName.slice(0,-1))(val) || val;
                     result[index] = deepMethod.apply(context, args);
                 } else {
                     if(deepMethod == null)
@@ -1376,7 +1460,7 @@
     }
 
     _.groupBy = group(function(key, ret, val) {
-        if(has(ret, key)) {
+        if(has(ret, String(key))) {
             ret[key].push(val);
         } else {
             ret[key] = [val];
@@ -1388,7 +1472,7 @@
     });
 
     _.countBy = group(function(key, ret, val) {
-        if(has(ret, key)) {
+        if(has(ret, String(key))) {
             ret[key]++
         } else {
             ret[key] = 1;
@@ -1451,7 +1535,7 @@
     _.partition = function(list, iteratee, context) {
         iteratee = cb(iteratee, context);
         var ret, keys;
-        if(_.isObject(list)) {
+        if(_.isRealObject(list)) {
             // ret = [{}, {}];
             ret = [[], []];
             keys = _.keys(list);
@@ -1508,82 +1592,113 @@
     }
 
     _.debounce = function(fn, delay, immediate) {
-        var timer = null;
-        var immediate = immediate || false;
+        var timer = null, isCallNow;
+        immediate = immediate || false;
         var result;
 
         var debounce = function() {
+            // cleartimeout in the first
+            if(timer) clearTimeout(timer);
             var context = this;
-            var args = [].slice.apply(arguments);
+            var args = arguments;
             if(false !== immediate) {
-                if(timer) clearTimeout(timer);
-                result = fn.apply(context, args);
-                immediate = false;
+                isCallNow = !timer;
+                timer = setTimeout(function() {
+                    //result can't return...
+                    // fix bug: can't callNow
+                    timer = null;
+                    // why the underscore not use under ?
+                    // I'cant understand, but for pass the test:debounce asap-incr was debounced
+                    // result = fn.apply(context, args);
+                }, delay);
 
-                timer = setTimeout(function () {
+                if(isCallNow) {
+                    result = fn.apply(context, args);
+                }
+
+            } else {
+
+                timer = setTimeout(function() {
+                    //result can't return...
+                    // fix bug: can't callNow
+                    timer = null;
                     result = fn.apply(context, args);
                 }, delay);
 
-                return result;
             }
 
-            if(timer) clearTimeout(timer);
-
-            timer = setTimeout(function() {
-                //result can't to return...
-                result = fn.apply(context, args);
-            }, delay);
+            return result;
 
         };
 
         debounce.reset = function (immediate) {
             immediate = immediate || false;
         };
-        debounce.cancell = function () {
+        debounce.cancel = function () {
             clearTimeout(timer);
             timer = null;
         };
+
+        return debounce;
     };
 
     _.throttle = function(fn, delay, options) {
-        var timer, context, args, result, previous;
+        // previous = 0 cause fn run immediately;
+        var timer, context, args, result, previous = 0;
         var options = options || {
+            // others: off, false: on
             leading: true,
+            // others: on, false: off
             trailing: true
         };
-
+        // delay = delay;
         var throttle = function() {
-            var now = new Date().getTime();
-            // previous = 0 cause fn run immediately;
-            if (previous === undefined) previous = 0;
+            var now = _.now();
+            // if (previous === undefined) previous = 0;
             //  = now cause fn can't run immediately;
-            if (!previous && options.leading !== false) previous = now;
+            if (!previous && options.leading === false) previous = now;
             var remaining = delay - (now - previous);
+            context = this;
+            args = arguments;
             if (remaining <= 0 || remaining > delay) {
                 //if enter delay limits clearTimeout remove trailing effect;
                 if(timer) {
                     clearTimeout(timer);
                     timer = null;
                 }
-                context = this;
-                args = [].slice.call(arguments);
-                result= fn.apply(context, args);
                 previous = now;
-                return result;
+                // fix bug:throttle-re-entrant, if re-call in the fn, must set the previous above the fn's invoke.
+                result = fn.apply(context, args);
+                if(!timer) context = args = null;
 
             } else if(!timer && options.trailing !== false) {
                 // trailing effect caused by setTimeout
                 timer = setTimeout(function() {
-                    fn.apply(context, args);
-                    context = args = null;
+
+                    // fix bug:lost context and args,because in the throttle-re-rntrant
+                    // fn's invoke,will get the newer timer, so if just timer = context = args = null
+                    // it will cause a bug;
+                    timer = null;
+
+                    // fix bug: call immediate
+                    // cause non-set-previous
+                    previous = options.leading === false ? 0 : _.now();
+                    result = fn.apply(context, args);
+                    // fix bug:
+                    if(!timer) {
+                        context = args = null;
+                    }
                 }, remaining);
             }
+            // fix bug: return undefined
+            return result;
         };
 
-        throttle.cancell = function() {
-            previous = now;
+        throttle.cancel = function() {
+            // previous = now;
             clearTimeout(timer);
-            timer = null;
+            previous = 0;
+            timer = context = args = null;
         };
 
         throttle.reset = function (options) {
@@ -1593,6 +1708,8 @@
                 trailing: true
             };
         };
+
+        return throttle;
     };
 
     _.timeChunk = function(arr, fn, count, context, wait) {
@@ -1637,65 +1754,76 @@
                 }
             }, wait);
         }
-
+        loop.reset = function(resetCount) {
+            if(!_.isNaN(Number(resetCount))) {
+                count = Number(resetCount) || count;
+            }
+            chunk = Math.max(1, count);
+        }
         return loop;
     };
 
     _.once = function(fn) {
+        var result, count = 0;
         return function() {
             var context = this;
-            var args = [].slice.call(arguments);
-            var result;
-            if(fn) {
+            var args = arguments;
+            // fix bug:re-call fn cause stackoverflow
+            count++
+            if(fn && count <= 1) {
                 result = fn.apply(context, args);
                 fn = null;
-                return result;
             }
+            return result;
         }
     };
 
     _.after = function(count, fn) {
-        var initCount = 0;
+        var initCount = 0, result;
+        
         if (!_.isNumber(count)) return noop;
+        count = count || 1;
         return function() {
             var context = this;
-            var args = [].slice.call(arguments);
+            var args = arguments;
             initCount++;
             if (initCount === count && fn) {
-                var result = fn.apply(context, args);
+                result = fn.apply(context, args);
                 fn = null;
-                return result;
             }
+            return result;
         }
     };
 
     _.before = function(count, fn) {
-        var initCount = 0;
+        var initCount = 0, result;
         if (!_.isNumber(count)) return noop;
+        count = count || 1;
         return function () {
             var context = this;
-            var args = [].slice.call(arguments);
+            var args = arguments;
             initCount++;
-            if (initCount <= count && fn) {
-                var result = fn.apply(context, args);
-                return result;
+            if (initCount < count && fn) {
+                result = fn.apply(context, args);
             } else {
                 fn = null;
             }
+            return result;
         }
     };
 
     _.wrap = function(fn, wrapper) {
-        if(!_.isFunction(fn, wrapper)) return noop;
-        return function() {
-            return wrapper(fn);
-        }
+        if(!_.isArgsFunction(fn, wrapper)) return noop;
+        return restArguments(function(args) {
+            args.unshift(fn);
+            return wrapper.apply(this, args);
+        })
     }
 
     //negate the type not the value ?
     //But undefined and null and NaN is not to negate
     //Number and NaN is not to negate
-    _.negateType = function(type) {
+    _.negateArgsType = function(type) {
         return _.wrapperByArgsNumber(function (target) {
             if (_.isFunction(type)) {
                 try {
@@ -1718,6 +1846,31 @@
                 return target == type;
             }
         }, true)
+    };
+
+    _.negateType = function(type) {
+        return function (target) {
+            if (_.isFunction(type)) {
+                try {
+                    //however, is something hasn't constructor ?
+                    if (target === undefined) return false;
+                    return target.constructor === type
+                } catch (error) {
+                    return target == undefined                        
+                }
+            }
+            try {
+                type = type.prototype.constructor
+            } catch (error) {
+                type = undefined;
+            }
+            if (type !== undefined) {
+
+                return target.prototype.constructor === type
+            } else {
+                return target == type;
+            }
+        }
     };
 
     // how it work ?
@@ -2269,6 +2422,12 @@
         }
         return model;
     }
+
+    _.each(_.functions(_), function(fnName, index, fns) {
+        if(/^is/.test(fnName)) {
+            _['isArgs' + fnName.slice(2)] = wrapperByArgsNumber(_[fnName], true);
+        }
+    })
 
     _.mixin(_);
 
