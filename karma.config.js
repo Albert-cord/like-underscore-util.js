@@ -19,6 +19,7 @@ module.exports = function(config) {
             // 'test/vendor/qunit-extras.js',
             'test/qunit-setup.js',
             'like-underscore-util.js',
+            // 'underscore.js',
             'test/*.js'
         ],
 
@@ -96,9 +97,9 @@ module.exports = function(config) {
         concurrency: Infinity
     }
 
-    if (process.env.TRAVIS) {
-        configuration.browsers = ['Chrome_travis_ci'];
-    }
+    // if (process.env.TRAVIS) {
+    //     configuration.browsers = ['Chrome_travis_ci'];
+    // }
      
     config.set(configuration);
 }

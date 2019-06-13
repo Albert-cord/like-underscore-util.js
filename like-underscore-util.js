@@ -1,6 +1,14 @@
 (function() {
-    var root = (typeof self === 'object' && self.self === self && self) || (typeof global === 'object'
-    && global.global === global && global) || this || {};
+    // to do:like-underscore --->O
+    // to do:add some useful method --->O
+    // to do:test module; --->O
+    // to do:add CI test module --->O
+    // to do:add to npm packages --->O
+    var root = typeof self == 'object' && self.self === self && self || typeof global == 'object'
+    && global.global === global && global || this || {};
+
+
+    var defaultLikeUnderscoreUtil = root._;
 
     var _ = function(obj) {
         if(obj instanceof _) return obj;
@@ -18,9 +26,8 @@
         root._ = _;
     }
     
-    _.version = '1.0.0'
+    _.VERSION = '1.0.0';
 
-    var defaultLikeUnderscoreUtil = root._;
     
     var ArrayProto = Array.prototype;
     var push = ArrayProto.push;
@@ -1994,7 +2001,7 @@
     });
 
     _.noConflict = function () {
-        // this cooperation will cover a variable _ ?
+        // this operation will cover a variable _ as undefined
         root._ = defaultLikeUnderscoreUtil;
         return this;
     };
@@ -2572,10 +2579,9 @@
 
     _.mixin(_);
 
-})()
-
-// to do:like-underscore --->O
-// to do:add some useful method --->O
-// to do:test module; --->O
-// to do:add CI test module --->O
-// to do:add to npm packages --->O
+    if(typeof define === 'function' && define.amd) {
+        define('underscore', [], function() {
+            return _;
+        })
+    };
+}());

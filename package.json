@@ -9,7 +9,8 @@
     "test": "npm run eslint && npm run test-node",
     "eslint": "eslint like-underscore-util.js test/*.js",
     "test-node": "qunit test/*.js",
-    "test-karma": "karma start ./karma.config.js"
+    "test-karma": "karma start ./karma.config.js",
+    "coveralls": "nyc npm run test-node && nyc report --reporter=text-lcov | coveralls"
   },
   "repository": {
     "type": "git",
@@ -28,11 +29,13 @@
   "dependencies": {},
   "devDependencies": {
     "codecov": "^3.5.0",
+    "coveralls": "^3.0.4",
     "karma": "^4.1.0",
     "karma-chrome-launcher": "^2.2.0",
     "karma-coverage": "^1.1.2",
     "karma-phantomjs-launcher": "^1.0.4",
     "karma-qunit": "^3.1.2",
+    "nyc": "^14.1.1",
     "qunit": "^2.9.2",
     "uglifyjs": "^2.4.11"
   },
