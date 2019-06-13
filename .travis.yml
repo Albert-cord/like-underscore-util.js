@@ -17,8 +17,8 @@ cache:
   directories:
   - node_modules
 before_install:
-  - npm install -g npm@2.6
-  - npm install -g karma-cli
+  # - npm install -g npm@2.6
+  # - npm install -g karma-cli
 before_script:
   - npm install karma-sauce-launcher
   - export DISPLAY=:99.0
