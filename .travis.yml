@@ -6,13 +6,13 @@ node_js:
   - 8
   - 7
   - 6
- matrix:
-   include:
-     - node_js: "4.0"
-       env: BROWSER=true
-branches:
-  only:
-  - master
+matrix:
+  include:
+    - node_js: "4.0"
+      env: BROWSER=true
+# branches:
+#   only:
+#   - master
 cache:
   directories:
   - node_modules
@@ -29,10 +29,10 @@ script:
   - npm run test
   - "[ $BROWSER == false ] || npm run test-karma"
   - "[ $BROWSER == false ] || karma start karma.conf-sauce.js"
-
-after_success:
-  - npm run coveralls
-  - bash <(curl -s https://codecov.io/bash)
 env:
   global:
   - CODECOV_TOKEN: 31102f8c-91a5-4809-a163-1fbb702e7204
+  # matrix: BROWSER=false
+after_success:
+- npm run coveralls
+- bash <(curl -s https://codecov.io/bash)
