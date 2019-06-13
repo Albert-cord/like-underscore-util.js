@@ -2,7 +2,7 @@
 // Generated on Sun Jun 02 2019 14:28:04 GMT+0800 (中国标准时间)
 
 module.exports = function(config) {
-    config.set({
+    var configuration = {
 
         // base path that will be used to resolve all patterns (eg. files, exclude)
         basePath: '',
@@ -84,9 +84,21 @@ module.exports = function(config) {
         // Continuous Integration mode
         // if true, Karma captures browsers, runs the tests and exits
         singleRun: false,
+        customLaunchers: {
+            Chrome_travis_ci: {
+                base: 'Chrome',
+                flags: ['--no-sandbox']
+            }
+        },
 
         // Concurrency level
         // how many browser should be started simultaneous
         concurrency: Infinity
-    })
+    }
+
+    if (process.env.TRAVIS) {
+        configuration.browsers = ['Chrome_travis_ci'];
+    }
+     
+    config.set(configuration);
 }
