@@ -12,14 +12,14 @@ module.exports = function(config) {
         // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
         frameworks: ['qunit'],
         // plugins: ['karma-qunit', 'karma-chrome-launcher', 'karma-phantomjs-launcher'],
-        plugins: ['karma-qunit', 'karma-chrome-launcher'],
+        plugins: ['karma-qunit', 'karma-chrome-launcher', 'karma-coverage'],
 
         // list of files / patterns to load in the browser
         files: [
             // 'test/vendor/qunit-extras.js',
-            // 'test/qunit-setup.js',
+            'test/qunit-setup.js',
             'like-underscore-util.js',
-            'test/array.js'
+            'test/*.js'
         ],
 
 
@@ -37,7 +37,7 @@ module.exports = function(config) {
         // test results reporter to use
         // possible values: 'dots', 'progress'
         // available reporters: https://npmjs.org/browse/keyword/karma-reporter
-        reporters: ['progress'],
+        reporters: ['progress', 'coverage'],
 
 
         // web server port
@@ -49,6 +49,17 @@ module.exports = function(config) {
                 showUI: true,
                 testTimeout: 5000
             }
+        },
+
+        coverageReporter: {
+            reporters: [
+                {
+                    type: 'text-summary', subdir: ''
+                },
+                {
+                    type: 'lcov', subdir: '', dir: 'coverage/'
+                }
+            ]
         },
 
         // enable / disable colors in the output (reporters and logs)

@@ -1,7 +1,7 @@
 (function() {
-    var root = (typeof self == 'object' && self.self == self && self) || (typeof global == 'object'
-    && global.global == global && global) || this || {};
-    
+    var root = (typeof self === 'object' && self.self === self && self) || (typeof global === 'object'
+    && global.global === global && global) || this || {};
+
     var _ = function(obj) {
         if(obj instanceof _) return obj;
         if(!(this instanceof _)) return new _(obj);
@@ -724,7 +724,8 @@
         return F;
     });
 
-    _.partial.placeholder = defaultLikeUnderscoreUtil;
+    // pass test#76:Functions module-partial
+    _.partial.placeholder = _;
 
     _.memoize = function(fn, hashFn) {
         // to use lru will avoid stockoverflow
@@ -1993,10 +1994,9 @@
     });
 
     _.noConflict = function () {
-        // this cooperation will not cover a variable _ ?
-        root._ = defaultLikeUnderscoreUtil
+        // this cooperation will cover a variable _ ?
+        root._ = defaultLikeUnderscoreUtil;
         return this;
-        // return defaultLikeUnderscoreUtil;
     };
 
     _.constant = function (obj) {
@@ -2552,7 +2552,7 @@
     }
 
     _.each(_.functions(_), function(fnName, index, fns) {
-        if(/^is/.test(fnName)) {
+        if(/^is/.test(fnName) && (fnName !== 'isEqual' || fnName !== 'isDeepEqual')) {
             _['isArgs' + fnName.slice(2)] = wrapperByArgsNumber(_[fnName], true);
         }
     })
@@ -2564,5 +2564,5 @@
 // to do:like-underscore --->O
 // to do:add some useful method --->O
 // to do:test module; --->O
-// to do:add CI test module --->X
+// to do:add CI test module --->O
 // to do:add to npm packages --->X

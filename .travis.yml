@@ -1,0 +1,24 @@
+language: node_js
+sudo: false
+node_js:
+  - 10
+  - 9
+  - 8
+  - 7
+  - 6
+branches:
+  only:
+  - master
+cache:
+  directories:
+  - node_modules
+install:
+  - npm install
+script:
+  - npm run test-karma
+
+after_success:
+- bash <(curl -s https://codecov.io/bash)
+env:
+  global:
+  - CODECOV_TOKEN: 31102f8c-91a5-4809-a163-1fbb702e7204

@@ -33,7 +33,7 @@
             var done = assert.async();
             var fs = require('fs');
             var vm = require('vm');
-            var filename = __dirname + '/../underscore.js';
+            var filename = __dirname + '/../like-underscore-util.js';
             fs.readFile(filename, function(err, content){
                 var sandbox = vm.createScript(
                     content + 'this.underscore = this._.noConflict();',

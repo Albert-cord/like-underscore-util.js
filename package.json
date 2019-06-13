@@ -6,7 +6,7 @@
   "scripts": {
     "test": "npm run eslint && npm run test-qunit",
     "eslint": "eslint like-underscore-util.js test/*.js",
-    "test-qunit": "qunit test/*.js",
+    "test-node": "qunit test/*.js",
     "test-karma": "karma start ./karma.config.js"
   },
   "repository": {
@@ -28,7 +28,9 @@
     "karma-phantomjs-launcher": "^1.0.4"
   },
   "devDependencies": {
+    "codecov": "^3.5.0",
     "karma-chrome-launcher": "^2.2.0",
+    "karma-coverage": "^1.1.2",
     "karma-qunit": "^3.1.2",
     "qunit": "^2.9.2"
   }
