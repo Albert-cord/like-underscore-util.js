@@ -4,7 +4,9 @@
   "description": "util-js-library.",
   "main": "like-underscore-util.js",
   "scripts": {
-    "test": "npm run eslint && npm run test-qunit",
+    "minify": "uglifyjs like-underscore-util.js -c \"evaluate=false\" --comments \"/    .*/\" -m",
+    "build": "npm run minify -- --source-map --source-map-url \" \" -o like-underscore-util-min.js",
+    "test": "npm run eslint && npm run test-node",
     "eslint": "eslint like-underscore-util.js test/*.js",
     "test-node": "qunit test/*.js",
     "test-karma": "karma start ./karma.config.js"
@@ -32,6 +34,7 @@
     "karma-chrome-launcher": "^2.2.0",
     "karma-coverage": "^1.1.2",
     "karma-qunit": "^3.1.2",
-    "qunit": "^2.9.2"
+    "qunit": "^2.9.2",
+    "uglifyjs": "^2.4.11"
   }
 }

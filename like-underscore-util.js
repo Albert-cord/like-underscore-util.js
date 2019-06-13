@@ -2223,14 +2223,16 @@
     });
 
 
-    _.onceLog = function(...args) {
+    _.onceLog = restArguments(function(args) {
         if (logOnce) return;
-        console.log('onceLog: ', ...args);
+        _.each(args, function(arg, i, args) {
+            console.log('onceLog: 第' + (i + 1) + '个参数: ', arg);
+        })
         logOnce = true;
-        setTimeout(() => {
+        setTimeout(function() {
             logOnce = false;
         }, 0)
-    };
+    });
 
     _.eqLog = function (eqArrs, logArrs, fnArrs) {
         if (eqArrs && Array.isArray(eqArrs) && (eqArrs.length === 0 || eqArrs.length % 2 === 1)) {
@@ -2242,8 +2244,10 @@
                 return null;
             }
         }
-        console.log('eqLog: ', ...logArrs);
-        fnArrs && fnArrs.forEach(fn => {
+        _.each(logArrs, function(arg, j, args) {
+            console.log('eqLog: 第' + (j + 1) + '个参数: ', arg);
+        })
+        fnArrs && _.each(fnArrs, function(fn) {
             typeof fn === 'function' && fn();
         });
     };
@@ -2294,7 +2298,7 @@
 
         var __proxy = Proxy.revocable(proxyTarget, {
 
-            get(target, property, receiver) {
+            get: function(target, property, receiver) {
                 if (_.some(carePropertyRegExpArr, function(regExp) {
                     if (!_.isRegExp(regExp) && _.isString(regExp)) {
                         regExp = new RegExp(regExp);
@@ -2314,7 +2318,7 @@
                 // return target[property];
             },
 
-            set(target, property, value, receiver) {
+            set: function(target, property, value, receiver) {
                 if (_.some(carePropertyRegExpArr, function (regExp) {
                     if (!_.isRegExp(regExp) && _.isString(regExp)) {
                         regExp = new RegExp(regExp);
@@ -2336,25 +2340,33 @@
 
         return {
             proxy: __proxy.proxy,
-            revoke() {
-                _proxySet.forEach(fn => fn());
+            revoke: function() {
+                var me = this;
+                _.each(_proxySet, function(fn) {
+                    fn.apply(me);
+                })
             }
         }
     }
 
 
-    var buildTree = _.buildTree = function (list, fn, context, {children, parent, model}) {
-        let temp = {};
-        let tree = {};
+    var buildTree = _.buildTree = function (list, fn, context, treeConfig) {
+        treeConfig = treeConfig || {};
+        var children = treeConfig.children;
+        var parent = treeConfig.parent;
+        var model = treeConfig.model;
+        
+        var temp = {};
+        var tree = {};
         children = children || 'children';
         parent = parent || 'parent';
         if(!_.isObject(list) && !_.isArray(list)) return;
         fn = cb(fn,context);
-        for (let j in list) {
+        for (var j in list) {
             if (has(list, j))
                 temp[list[j].name] = list[j];
         }
-        for (let i in temp) {
+        for (var i in temp) {
             if (!has(temp, i)) continue;
 
             if (temp[i][parent] && temp[i][parent].length > 0) {
@@ -2386,7 +2398,7 @@
             if (!(has(model, relationClasses) && _.isArray(model.relationClasses))) {
                 model.relationClasses = [];
             }
-            for (let k in tree) {
+            for (var k in tree) {
                 if (!has(tree, k)) continue;
 
                 if (tree[k][children] == undefined || (tree[k][children] && tree[k][children].length == 0)) {
@@ -2412,15 +2424,15 @@
                 context.__fn = this;
                 if (context != window) {
                     this.__children = this.__children || [];
-                    `${context.__proto__.constructor.name}` !== ''
-                        && this.__children.indexOf(`${context.__proto__.constructor.name}`) == -1
-                        && `${context.__proto__.constructor.name}` != this.name
-                        && this.__children.push(`${context.__proto__.constructor.name}`);
+                    toString.call(context.__proto__.constructor.name) !== ''
+                        && this.__children.indexOf(toString.call(context.__proto__.constructor.name)) == -1
+                        && toString.call(context.__proto__.constructor.name) != this.name
+                        && this.__children.push(toString.call(context.__proto__.constructor.name));
 
                     context.__proto__.constructor.__parents = context.__proto__.constructor.__parents || [];
-                    `${this.name}` !== '' && context.__proto__.constructor.__parents.indexOf(`${this.name}`) == -1
-                        && context.__proto__.constructor.name != `${this.name}`
-                        && context.__proto__.constructor.__parents.push(`${this.name}`);
+                    toString.call(this.name) !== '' && context.__proto__.constructor.__parents.indexOf(toString.call(this.name)) == -1
+                        && context.__proto__.constructor.name != toString.call(this.name)
+                        && context.__proto__.constructor.__parents.push(toString.call(this.name));
                     // console.log(context.__proto__.constructor.__parents.length > 1 ? context.__proto__.constructor.__parents : "");
                 }
                 var args = [];
@@ -2440,15 +2452,15 @@
 
                 if (context != window) {
                     this.__children = this.__children || [];
-                    `${context.__proto__.constructor.name}` !== ''
-                        && this.__children.indexOf(`${context.__proto__.constructor.name}`) == -1
-                        && `${context.__proto__.constructor.name}` != this.name
-                        && this.__children.push(`${context.__proto__.constructor.name}`);
+                    toString.call(context.__proto__.constructor.name) !== ''
+                        && this.__children.indexOf( toString.call(context.__proto__.constructor.name)) == -1
+                        &&  toString.call(context.__proto__.constructor.name) != this.name
+                        && this.__children.push(toString.call(context.__proto__.constructor.name));
 
                     context.__proto__.constructor.__parents = context.__proto__.constructor.__parents || [];
-                    `${this.name}` !== '' && context.__proto__.constructor.__parents.indexOf(`${this.name}`) != -1
-                        && context.__proto__.constructor.name != `${this.name}`
-                        && context.__proto__.constructor.__parents.push(`${this.name}`);
+                    toString.call(this.name) !== '' && context.__proto__.constructor.__parents.indexOf(toString.call(this.name)) != -1
+                        && context.__proto__.constructor.name != toString.call(this.name)
+                        && context.__proto__.constructor.__parents.push(toString.call(this.name));
                     // console.log(context.__proto__.constructor.__parents.length > 1 ? context.__proto__.constructor.__parents : "");
                 }
                 var result;
@@ -2468,7 +2480,7 @@
         }
 
         for (var _prop in env) {
-            if (has(env, _prop) && originalPropArr.indexOf(_prop) === -1) originalPropArr.push(`${_prop}`);
+            if (has(env, _prop) && originalPropArr.indexOf(_prop) === -1) originalPropArr.push(toString.call(_prop));
         }
     }
 
@@ -2488,14 +2500,15 @@
                 nullAndUndefineds: []
             }
         };
-        var _typesForModel;
+        var _typesForModel, toStringProp;
         originalPropArr.push('_typesForModel', 'model');
 
         for (var _prop in env) {
+            toStringProp = toString.call(_prop);
             if (Object.prototype.hasOwnProperty.call(env, _prop)
-                && originalPropArr.indexOf(`${_prop}`) === -1) {
+                && originalPropArr.indexOf(toStringProp) === -1) {
                 if (env[_prop] === null || env[_prop] === undefined) {
-                    model['props']['nullAndUndefineds'].push(`${_prop}`);
+                    model['props']['nullAndUndefineds'].push(toStringProp);
                     continue;
                 }
                 _typesForModel = typeof env[_prop];
@@ -2503,31 +2516,31 @@
                 switch (_typesForModel) {
 
                 case 'function': {
-                    model['classes'].push(`${_prop}`);
+                    model['classes'].push(toStringProp);
                     break;
                 }
                 case 'boolean': {
-                    model['props']['bools'].push(`${_prop}`);
+                    model['props']['bools'].push(toStringProp);
                     break;
                 }
                 case 'string': {
-                    model['props']['strs'].push(`${_prop}`);
+                    model['props']['strs'].push(toStringProp);
                     break;
                 }
                 case 'number': {
-                    model['props']['nums'].push(`${_prop}`);
+                    model['props']['nums'].push(toStringProp);
                     break;
                 }
                 case 'object': {
                     if (Array.isArray(env[_prop])) {
-                        model['props']['arrs'].push(`${_prop}`);
+                        model['props']['arrs'].push(toStringProp);
                     } else {
-                        model['props']['objs'].push(`${_prop}`);
+                        model['props']['objs'].push(toStringProp);
                     }
                     break;
                 }
                 default: {
-                    model['props']['vals'].push(`${_prop}`);
+                    model['props']['vals'].push(toStringProp);
                     break;
                 }
 
@@ -2535,7 +2548,7 @@
             }
         }
 
-        model.retClasses = model.classes.map(name => {
+        model.retClasses = _.map(model.classes, function(name){
             return {
                 name: name,
                 parent: env[name].__parents,
