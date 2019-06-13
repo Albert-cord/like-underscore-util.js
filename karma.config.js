@@ -12,14 +12,13 @@ module.exports = function(config) {
         // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
         frameworks: ['qunit'],
         // plugins: ['karma-qunit', 'karma-chrome-launcher', 'karma-phantomjs-launcher'],
-        plugins: ['karma-qunit', 'karma-chrome-launcher', 'karma-coverage'],
+        plugins: ['karma-qunit', 'karma-phantomjs-launcher', 'karma-coverage'],
 
         // list of files / patterns to load in the browser
         files: [
             // 'test/vendor/qunit-extras.js',
             'test/qunit-setup.js',
             'like-underscore-util.js',
-            // 'underscore.js',
             'test/*.js'
         ],
 
@@ -78,19 +77,19 @@ module.exports = function(config) {
 
         // start these browsers
         // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
-        // browsers: ['PhantomJS'],
-        browsers: ['Chrome'],
+        browsers: ['PhantomJS'],
+        // browsers: ['Chrome'],
 
 
         // Continuous Integration mode
         // if true, Karma captures browsers, runs the tests and exits
         singleRun: false,
-        customLaunchers: {
-            Chrome_travis_ci: {
-                base: 'Chrome',
-                flags: ['--no-sandbox']
-            }
-        },
+        // customLaunchers: {
+        //     Chrome_travis_ci: {
+        //         base: 'Chrome',
+        //         flags: ['--no-sandbox']
+        //     }
+        // },
 
         // Concurrency level
         // how many browser should be started simultaneous

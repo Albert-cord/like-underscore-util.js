@@ -887,7 +887,7 @@
         return deepEq(a, b, aStack, bStack);
     }
 
-    var SymbolProto = Symbol.prototype;
+    var SymbolProto = typeof Symbol.prototype !== 'undefined' ? Symbol.prototype : null;
 
     var deepEq = function(a, b, aStack, bStack) {
         if(a instanceof _) a = a._wrapped;
