@@ -25,10 +25,13 @@ before_script:
   # - sh -e /etc/init.d/xvfb start
 install:
   - npm install
+  - npm install -g codecov
 script:
   - npm run test
   - "[ $BROWSER == false ] || npm run test-karma"
   - "[ $BROWSER == false ] || karma start karma.conf-sauce.js"
+  - istanbul cover ./node_modules/mocha/bin/_mocha --reporter lcovonly -- -R spec
+  - codecov
 env:
   global:
   - CODECOV_TOKEN: 31102f8c-91a5-4809-a163-1fbb702e7204
