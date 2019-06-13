@@ -1,6 +1,6 @@
 {
   "name": "underscore-util-js",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "util-js-library.",
   "main": "like-underscore-util.js",
   "scripts": {
@@ -25,16 +25,20 @@
     "url": "https://github.com/Albert-cord/like-underscore-util.js/issues"
   },
   "homepage": "https://github.com/Albert-cord/like-underscore-util.js#readme",
-  "dependencies": {
-    "karma": "^4.1.0",
-    "karma-phantomjs-launcher": "^1.0.4"
-  },
+  "dependencies": {},
   "devDependencies": {
     "codecov": "^3.5.0",
+    "karma": "^4.1.0",
     "karma-chrome-launcher": "^2.2.0",
     "karma-coverage": "^1.1.2",
+    "karma-phantomjs-launcher": "^1.0.4",
     "karma-qunit": "^3.1.2",
     "qunit": "^2.9.2",
     "uglifyjs": "^2.4.11"
-  }
+  },
+  "files": [
+    "like-underscore-util.js",
+    "like-underscore-util-min.js",
+    "like-underscore-util-min.js.map"
+  ]
 }

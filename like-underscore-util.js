@@ -2578,4 +2578,4 @@
 // to do:add some useful method --->O
 // to do:test module; --->O
 // to do:add CI test module --->O
-// to do:add to npm packages --->X
+// to do:add to npm packages --->O
