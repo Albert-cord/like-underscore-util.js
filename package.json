@@ -10,6 +10,7 @@
     "eslint": "eslint like-underscore-util.js test/*.js",
     "test-node": "qunit test/*.js",
     "test-karma": "karma start ./karma.config.js",
+    "coverage": "nyc npm run test-node && nyc report",
     "coveralls": "nyc npm run test-node && nyc report --reporter=text-lcov > coverage.lcov && codecov"
   },
   "repository": {

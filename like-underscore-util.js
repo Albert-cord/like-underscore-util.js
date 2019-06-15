@@ -964,45 +964,8 @@
     }
 
     _.isDeepEqual = _.isEqual = function (obj, other) {
-        // how to easy to check isEqual?
-        // only property ?or prototype ?
-        // to check prototype chain 
-        // if(_.isObject(obj, other)) {
-
-        //     return obj == other || (function(obj, other) {
-        //         var checkedObj = [];
-        //         var objKeys = _.allKeys(obj);
-        //         var otherKeys = _.allKeys(other);
-        //         if(objKeys.length !== otherKeys.length) return false;
-        //         for(var i = 0, o, ot; i < objKeys.length; i++) {
-        //             o = obj[objKeys[i]];
-        //             ot = other[otherKeys[i]];
-        //             if(checkedObj.indexOf(o) !== -1 && checkedObj.indexOf(o) !== -1 && o != ot) {
-        //                 checkedObj = null;
-        //                 return false;
-        //             } 
-        //             if(_.isObjectLike(o, ot) && (checkedObj.push(o, ot), !_.isDeepEqual(o, ot))) {
-        //                 checkedObj = null;                        
-        //                 return false;
-        //             } else {
-        //                 checkedObj = null;
-        //                 if(!_.isObjectLike(o) && !_.isObjectLike(ot) && ot !== o) {
-        //                     checkedObj = null;
-        //                     return false
-        //                 } else {
-        //                     checkedObj = null;
-        //                     return false;
-        //                 }
-        //             }
-        //         }
-        //         return true;
-        //     })(obj, other)        
-        // } else {
-        //     return obj === other;
-        // }
-
+        
         return (obj === other && obj !== 0) || eq(obj, other);
-
     }
 
     var has = function(obj, prop) {
