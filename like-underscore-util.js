@@ -2440,8 +2440,8 @@
                 for (var i = 1, len = arguments.length; i < len; i++) {
                     args.push('arguments[' + i + ']');
                 }
-
-                var result = eval('context.__fn(' + args + ')');
+                // var result = eval('context.__fn(' + args + ')');
+                var result = new Function('args', `return context.__fn(args);`)(args);
                 delete context.__fn
                 return result;
             }
@@ -2473,7 +2473,9 @@
                         args.push('arr[' + i + ']');
                     }
 
-                    result = eval('context.__fn(' + args + ')')
+                    // result = eval('context.__fn(' + args + ')')
+                    result = new Function('args', `return context.__fn(args);`)(args);
+
                 }
                 return result;
             }

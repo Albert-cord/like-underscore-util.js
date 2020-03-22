@@ -36,7 +36,7 @@
             var filename = __dirname + '/../like-underscore-util.js';
             fs.readFile(filename, function(err, content){
                 var sandbox = vm.createScript(
-                    content + 'this.underscore = this._.noConflict();',
+                    content + '\nthis.underscore = this._.noConflict();',
                     filename
                 );
                 var context = {_: 'oldvalue'};
