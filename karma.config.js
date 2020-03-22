@@ -2,7 +2,7 @@
 // Generated on Sun Jun 02 2019 14:28:04 GMT+0800 (中国标准时间)
 
 module.exports = function(config) {
-    config.set({
+    var configuration = {
 
         // base path that will be used to resolve all patterns (eg. files, exclude)
         basePath: '',
@@ -12,7 +12,7 @@ module.exports = function(config) {
         // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
         frameworks: ['qunit'],
         // plugins: ['karma-qunit', 'karma-chrome-launcher', 'karma-phantomjs-launcher'],
-        plugins: ['karma-qunit', 'karma-chrome-launcher', 'karma-coverage'],
+        plugins: ['karma-qunit', 'karma-phantomjs-launcher', 'karma-coverage'],
 
         // list of files / patterns to load in the browser
         files: [
@@ -77,16 +77,28 @@ module.exports = function(config) {
 
         // start these browsers
         // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
-        // browsers: ['PhantomJS'],
-        browsers: ['Chrome'],
+        browsers: ['PhantomJS'],
+        // browsers: ['Chrome'],
 
 
         // Continuous Integration mode
         // if true, Karma captures browsers, runs the tests and exits
         singleRun: false,
+        // customLaunchers: {
+        //     Chrome_travis_ci: {
+        //         base: 'Chrome',
+        //         flags: ['--no-sandbox']
+        //     }
+        // },
 
         // Concurrency level
         // how many browser should be started simultaneous
         concurrency: Infinity
-    })
+    }
+
+    // if (process.env.TRAVIS) {
+    //     configuration.browsers = ['Chrome_travis_ci'];
+    // }
+     
+    config.set(configuration);
 }
