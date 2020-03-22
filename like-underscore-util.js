@@ -2411,7 +2411,7 @@
                     args.push('arguments[' + i + ']');
                 }
                 // var result = eval('context.__fn(' + args + ')');
-                var result = new Function('args', `return context.__fn(args);`)(args);
+                var result = new Function('args', 'return context.__fn(args);')(args);
                 delete context.__fn
                 return result;
             }
@@ -2444,7 +2444,7 @@
                     }
 
                     // result = eval('context.__fn(' + args + ')')
-                    result = new Function('args', `return context.__fn(args);`)(args);
+                    result = new Function('args', 'return context.__fn(args);')(args);
 
                 }
                 return result;
